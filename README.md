@@ -5,7 +5,7 @@ MineScript is a scripting language that allows you to easily create complex Mine
 
 __Documentation:__
 
-   <http://google.com>
+   Not available yet
    
 __Source code repository and issue tracker:__
 
