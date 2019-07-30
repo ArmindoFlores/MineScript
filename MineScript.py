@@ -82,6 +82,7 @@ def main(file, name):
     
 
 def assemble_pack(name, memory, path):
+    global commands
     # Setup scoreboard  variables
     with open(os.path.join(path, name, "data", name, "functions", "setup.mcfunction"), "w") as file:
         print("Setting up variables")
@@ -90,6 +91,7 @@ def assemble_pack(name, memory, path):
                 print("Found ingame variable %s, adding it to the scoreboard"%variable)
                 file.write("scoreboard objectives add %s dummy {\"text\":\"%s\"}\n"%(variable, variable.capitalize()))
                 file.write("scoreboard players set MineScript %s 0\n"%variable)
+                commands += 2
 
     # Setup "_temp%%" variables
     with open(os.path.join(path, name, "data", name, "functions", "temp.mcfunction"), "w") as file:
@@ -98,6 +100,7 @@ def assemble_pack(name, memory, path):
             if variable.startswith("_"):
                 file.write("scoreboard objectives add %s dummy\n"%variable)
                 file.write("scoreboard players set MineScript %s 0\n"%variable)
+                commands += 2
 
     # Setup "_for%%" loops
     print("\nSetting up loops")
@@ -105,6 +108,7 @@ def assemble_pack(name, memory, path):
         with open(os.path.join(path, name, "data", name, "functions", "%s.mcfunction"%loop), "w") as file:
             for command in memory[3][loop]:
                 file.write(command + "\n")
+                commands += 1
                 
     print("\nSetting up functions")
     
@@ -115,13 +119,16 @@ def assemble_pack(name, memory, path):
         with open(os.path.join(path, name, "data", name, "functions", "load.mcfunction"), "w") as file:
             file.write("function %s:setup\n"%name)
             file.write("function %s:temp\n"%name)
+            commands += 2
             for line in content:
                 file.write(line+"\n")
+                commands += 1
         del memory[2]["load"]
     else:
         with open(os.path.join(path, name, "data", name, "functions", "load.mcfunction"), "w") as file:
             file.write("function %s:setup\n"%name)
             file.write("function %s:temp\n"%name)
+            commands += 2
     
     if "tick" in memory[2]:
         print("Found tick function, exporting")
@@ -129,6 +136,7 @@ def assemble_pack(name, memory, path):
         with open(os.path.join(path, name, "data", name, "functions", "tick.mcfunction"), "w") as file:
             for line in content:
                 file.write(line+"\n")
+                commands += 1
         del memory[2]["tick"]
 
 
@@ -138,9 +146,10 @@ def assemble_pack(name, memory, path):
         with open(os.path.join(path, name, "data", name, "functions", "%s.mcfunction"%function), "w") as file:
             for line in content:
                 file.write(line+"\n")
+                commands += 1
         
 try:
-
+    commands = 0
     if sys.argv[0] == "python":
         filename = sys.argv[2]
     else:
@@ -176,7 +185,8 @@ try:
     assemble_pack(name, memory, path)
 
     shutil.make_archive(os.path.join(distpath, name), 'zip', os.path.join(path, name))
-
+    print("\nFinished building %s."%name)
+    print("Total: %i commands"%commands)
     input("Press enter to continue...")
     
 except Exception as e:

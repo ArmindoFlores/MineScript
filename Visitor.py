@@ -90,6 +90,7 @@ class Visitor(MineScriptVisitor):
         self.igmemory = {}
         self.igloops = {}
         self.loop = []
+        self.execute = []
         self.loops = 0
         self.temp = 0
         self.tag = 0
@@ -101,6 +102,13 @@ class Visitor(MineScriptVisitor):
     def add_cmd(self, command):
         if self.if_stat is not None:
             command = self.if_stat + " run " + command
+        if self.execute != []:
+            for i in range(len(self.execute)):
+                pre = ""
+                pos = ""
+                if i == len(self.execute)-1: pos = " run"
+                if i == 0: pre = "execute "
+                command = pre + self.execute[i] + pos + " " + command          
         if self.loop != []:
             self.igloops[self.loop[-1]].append(command)
         else:
@@ -113,7 +121,13 @@ class Visitor(MineScriptVisitor):
 
     def pop_loop(self):
         self.loop.pop()
-        
+
+    def add_exec(self, cmd):
+        self.execute.append(cmd)
+
+    def pop_exec(self):
+        self.execute.pop()
+         
     def visitIgAssign(self, ctx):  # Expression of type $var = expression
         name = ctx.ID().getText()
         value = self.visitChildren(ctx)
@@ -256,6 +270,13 @@ class Visitor(MineScriptVisitor):
         elif ctx.op.type == MineScriptParser.EQ: self.add_cmd("execute if score MineScript %s = MineScript _temp%i run scoreboard players set MineScript _temp%i 1"%(name, self.temp-1, self.temp))
         elif ctx.op.type == MineScriptParser.DIF: self.add_cmd("execute unless score MineScript %s = MineScript _temp%i run scoreboard players set MineScript _temp%i 1"%(name, self.temp-1, self.temp))
         return "_temp%i"%self.temp
+
+    def visitExecute(self, ctx):  # Expression of type $execute(execute){ stat }
+        execute = str(self.visit(ctx.expr()))
+        stat = ctx.stat()
+        self.add_exec(execute)
+        self.visit(stat)
+        self.pop_exec()
 
     def visitIgComparisonIg(self, ctx):  # Expression of type $expression (> < <= >= != ==) $expression
         name1 = self.visit(ctx.igexpr(0))
@@ -469,7 +490,7 @@ class Visitor(MineScriptVisitor):
         
     def visitIgPrint(self, ctx):  # Expression of type $print(genexpression,...| COLOR)
         text = []
-        for child in ctx.igPrintArg():
+        for child in ctx.igPrintControl().igPrintArg():
             e = child.genexpr()
             if child.COLOR() is not None: color = child.COLOR().getText()
             else: color = "white"

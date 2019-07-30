@@ -3,28 +3,23 @@ grammar MineScript;            // Define a grammar called MineScript
 prog:   stat+ ;
 
 stat
-    :   expr NEWLINE                                        # statement
-    |   igexpr NEWLINE                                      # igStatement
-    |   '{' stat* '}'                                       # blockstat
-    |   variableDeclaration NEWLINE                         # assignStat
-    |   igVariableDeclaration NEWLINE                       # igAssignStat
-    |   'print' '(' expr (',' expr)* ')' NEWLINE            # print
-    |   'for' forControl stat                               # for
-    |   'if' '(' expr ')' stat ('else' stat)?               # ifElse
-    |   'function' ID stat                                  # funcDef      
-    |   '$function' ID stat                                 # igFuncDef
-    |   '$if' '(' igexpr ')' stat ('$else' stat)?           # igIfElse
-    |   '$setdisplay' '(' igexpr ',' DSPL_MODE ')' NEWLINE  # setDisplay
-    |   '$for' igForControl stat                            # igFor
-    |   '$forentity' '(' expr ';' ID ')' stat               # igForEntity 
-    |   '$print' igPrintControl NEWLINE                     # igPrint
-    |   '$tp' '(' expr ',' expr ')' NEWLINE                 # teleport
-    |   '$addtag' '(' expr ',' expr ')' NEWLINE             # addTag
-    |   '$remtag' '(' expr ',' expr ')' NEWLINE             # remTag
-    |   '$mc' '(' expr ')' NEWLINE                          # command
-    |   '$addobj' '(' expr ',' expr ')' NEWLINE             # addObj
-    |   '$setscore' '(' expr ',' expr ',' genexpr ')' NEWLINE # setScore
-    |   NEWLINE                                             # blank
+    :   expr NEWLINE                                            # statement
+    |   igexpr NEWLINE                                          # igStatement
+    |   '{' stat* '}'                                           # blockstat
+    |   variableDeclaration NEWLINE                             # assignStat
+    |   igVariableDeclaration NEWLINE                           # igAssignStat
+    |   'print' '(' expr (',' expr)* ')' NEWLINE                # print
+    |   'for' forControl stat                                   # for
+    |   'if' '(' expr ')' stat ('else' stat)?                   # ifElse
+    |   'function' ID stat                                      # funcDef      
+    |   '$function' ID stat                                     # igFuncDef
+    |   '$if' '(' igexpr ')' stat ('$else' stat)?               # igIfElse
+    |   '$setdisplay' '(' igexpr ',' DSPL_MODE ')' NEWLINE      # setDisplay
+    |   '$for' igForControl stat                                # igFor
+    |   '$forentity' '(' expr ';' ID ')' stat                   # igForEntity 
+    |   '$execute' '(' expr ')' stat                            # execute
+    |   '$mc' '(' expr ')' NEWLINE                              # command
+    |   NEWLINE                                                 # blank
     ;
 
 expr
@@ -58,7 +53,13 @@ igexpr
     |   '$isblock' '(' expr ',' expr ',' expr ')'              # isBlock
     |   '$count' '(' expr ')'                                  # count
     |   '$getscore' '(' expr ',' expr ')'                      # getScore
-    |   '$hastag' '(' expr ',' expr ',' expr ')'               # hasTag
+    |   '$hastag' '(' expr ',' expr ')'                        # hasTag
+    |   '$print' igPrintControl                                # igPrint
+    |   '$tp' '(' expr ',' expr ')'                            # teleport
+    |   '$addtag' '(' expr ',' expr ')'                        # addTag
+    |   '$remtag' '(' expr ',' expr ')'                        # remTag
+    |   '$addobj' '(' expr ',' expr ')'                        # addObj
+    |   '$setscore' '(' expr ',' expr ',' genexpr ')'          # setScore
     ;
 
 genexpr
