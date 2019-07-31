@@ -9,7 +9,7 @@ __How to build MineScript__
    2. Run the command `java org.antlr.v4.Tool -Dlanguage=Python3 -visitor -no-listener MineScript.g4` on the MineScript directory.
    3. To turn your code into a minecraft datapack, use `MineScript.py yourfile.ms` on the command line
    
-   Alternatively, you can download the binary file [here](http://bit.ly/2SYtBuP)
+   Alternatively, you can download the binary file [here](https://github.com/ArmindoFlores/MineScript/releases/download/v1.0.0-alpha/minescript.exe)
 
 __Documentation:__
 
