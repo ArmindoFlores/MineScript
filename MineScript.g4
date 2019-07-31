@@ -25,7 +25,7 @@ stat
     ;
 
 expr
-    :   expr op=('*'|'/'|'-'|'+'|'%') expr          # op
+    :   expr op=('*'|'/'|'-'|'+'|'%'|'^') expr     # op
     |   ID                                          # id
     |   literal                                     # constant
     |   array                                       # constantArray
@@ -47,9 +47,9 @@ igexpr
     :   '$' ID                                                 # igId
     |   '$' ID '()'                                            # igFuncCall
     |   igexpr op=('>'|'<'|'>='|'<='|'=='|'!=') igexpr         # igComparisonIg
-    |   igexpr op=('*'|'/'|'+'|'-'|'%') igexpr                 # igOpIg
+    |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr             # igOpIg
     |   igexpr op=('>'|'<'|'>='|'<='|'=='|'!=') expr           # igComparison
-    |   igexpr op=('*'|'/'|'+'|'-'|'%') expr                   # igOp
+    |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') expr               # igOp
     |   '(' igexpr ')'                                         # igParens
     |   '$pos(' expr ',' expr ')'                              # getPos
     |   '$isblock' '(' expr ',' expr ',' expr ')'              # isBlock
@@ -106,15 +106,15 @@ igPrintArg
 variableDeclaration
     :   ID '=' expr                                 # assign  
     |   ID op=('++' | '--')                         # assignUnit
-    |   ID op=('+='|'-='|'*='|'/='|'%=') expr       # assignOp
+    |   ID op=('+='|'-='|'*='|'/='|'%='|'^=') expr  # assignOp
     ;
 
 igVariableDeclaration
-    :   '$' ID '=' expr                                # igAssign
-    |   '$' ID '=' igexpr                              # igAssignIg
-    |   '$' ID op=('++'|'--')                          # igAssignUnit
-    |   '$' ID op=('+='|'-='|'*='|'/='|'%=') expr      # igAssignOp
-    |   '$' ID op=('+='|'-='|'*='|'/='|'%=') igexpr    # igAssignIgOp
+    :   '$' ID '=' expr                                 # igAssign
+    |   '$' ID '=' igexpr                               # igAssignIg
+    |   '$' ID op=('++'|'--')                           # igAssignUnit
+    |   '$' ID op=('+='|'-='|'*='|'/='|'%='|'*=') expr  # igAssignOp
+    |   '$' ID op=('+='|'-='|'*='|'/='|'%='|'*=') igexpr# igAssignIgOp
     ;
 
 
@@ -190,6 +190,7 @@ MUL :   '*' ;            // assigns token name to '*' used above in grammar
 DIV :   '/' ;
 ADD :   '+' ;
 SUB :   '-' ;
+POW :   '^' ;
 MOD :   '%' ;
 GT  :   '>' ;
 LT  :   '<' ;
