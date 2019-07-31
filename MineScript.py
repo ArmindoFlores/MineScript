@@ -2,11 +2,13 @@ import sys
 import os
 import traceback
 import shutil
+from colorama import init, Style, Fore
 from antlr4 import *
 from MineScriptLexer import MineScriptLexer
 from MineScriptParser import MineScriptParser
 from Visitor import Visitor
 
+init(convert=True)
 
 packmeta = """{
   "pack": {
@@ -78,6 +80,10 @@ def main(file, name):
     visitor = Visitor(name, code)
     visitor.visit(tree)
 
+    for call in visitor.igcalls:
+        if call[0] not in visitor.igmemory:
+            print(f"{Fore.YELLOW}Warning: Variable {call[0]} referenced without assignement in line {call[1]}{Style.RESET_ALL}")
+    print("")
     return (visitor.memory, visitor.igmemory, visitor.igfunctions, visitor.igloops)
     
 

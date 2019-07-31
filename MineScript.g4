@@ -10,12 +10,14 @@ stat
     |   igVariableDeclaration NEWLINE                           # igAssignStat
     |   'print' '(' expr (',' expr)* ')' NEWLINE                # print
     |   'for' forControl stat                                   # for
+    |   'while' '(' expr ')' stat                               # while
     |   'if' '(' expr ')' stat ('else' stat)?                   # ifElse
     |   'function' ID stat                                      # funcDef      
     |   '$function' ID stat                                     # igFuncDef
     |   '$if' '(' igexpr ')' stat ('$else' stat)?               # igIfElse
     |   '$setdisplay' '(' igexpr ',' DSPL_MODE ')' NEWLINE      # setDisplay
     |   '$for' igForControl stat                                # igFor
+    |   '$while' '(' genexpr ')' stat                           # igWhile
     |   '$forentity' '(' expr ';' ID ')' stat                   # igForEntity 
     |   '$execute' '(' expr ')' stat                            # execute
     |   '$mc' '(' expr ')' NEWLINE                              # command
@@ -60,6 +62,7 @@ igexpr
     |   '$remtag' '(' expr ',' expr ')'                        # remTag
     |   '$addobj' '(' expr ',' expr ')'                        # addObj
     |   '$setscore' '(' expr ',' expr ',' genexpr ')'          # setScore
+    |   '$getdata' '(' expr ',' expr (',' expr)? ')'           # getData
     ;
 
 genexpr
