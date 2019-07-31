@@ -13,7 +13,7 @@ __How to build MineScript__
 
 __Documentation:__
 
-   Not available yet
+   <https://minescript.readthedocs.io>
    
 __Source code repository and issue tracker:__
 
