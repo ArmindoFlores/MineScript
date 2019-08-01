@@ -32,9 +32,9 @@ $function stop $running = 0  # Disable the `tick` function
 
 How it looks in-game:
 
-![Fib1](https://github.com/ArmindoFlores/MineScript/docs/fib1.png "Fibonacci Sequence")
+![Fib1](https://github.com/ArmindoFlores/MineScript/blob/master/docs/fib1.png "Fibonacci Sequence")
 
-![Fib2](https://github.com/ArmindoFlores/MineScript/docs/fib2.png "Fibonacci Sequence")
+![Fib2](https://github.com/ArmindoFlores/MineScript/blob/master/docs/fib2.png "Fibonacci Sequence")
 
 
 ### Display a player's x position on the sidebar
