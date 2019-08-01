@@ -1,9 +1,0 @@
-site_name: MineScript
-theme: readthedocs
-
-nav:
-    - Home: index.md
-    - Installation: install.md
-    - Usage: use.md
-    - Commands: cmds.md
-    - Examples: examples.md
