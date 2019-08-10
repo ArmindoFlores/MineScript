@@ -106,15 +106,15 @@ igPrintArg
 variableDeclaration
     :   ID '=' expr                                 # assign  
     |   ID op=('++' | '--')                         # assignUnit
-    |   ID op=('+='|'-='|'*='|'/='|'%='|'^=') expr  # assignOp
+    |   ID op=('+='|'-='|'*='|'/='|'%=') expr       # assignOp
     ;
 
 igVariableDeclaration
     :   '$' ID '=' expr                                 # igAssign
     |   '$' ID '=' igexpr                               # igAssignIg
     |   '$' ID op=('++'|'--')                           # igAssignUnit
-    |   '$' ID op=('+='|'-='|'*='|'/='|'%='|'*=') expr  # igAssignOp
-    |   '$' ID op=('+='|'-='|'*='|'/='|'%='|'*=') igexpr# igAssignIgOp
+    |   '$' ID op=('+='|'-='|'*='|'/='|'%=') expr       # igAssignOp
+    |   '$' ID op=('+='|'-='|'*='|'/='|'%=') igexpr     # igAssignIgOp
     ;
 
 
