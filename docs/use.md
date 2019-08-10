@@ -45,6 +45,7 @@ As of this version, there are only 5 arithmetic operators:
 | `*`		| Multiplication |
 | `/`		| Division |
 | `%`		| Modulo |
+| `^`		| Exponentiation |
 
 ### If / Else statements
 
