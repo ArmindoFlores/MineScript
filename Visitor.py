@@ -1,8 +1,9 @@
+import re
+import pickle
+from colorama import init, Style, Fore
 from MineScriptVisitor import MineScriptVisitor
 from MineScriptParser import MineScriptParser
-from colorama import init, Style, Fore
-import re
-
+import tags
 
 approved_attrs = [
     "append",
@@ -46,7 +47,6 @@ valueerror2 = "ValueError: Could not convert to int: '%s'"
 
 valueerror3 = "ValueError: Selector not formatted correctly"
 
-
 def add_to_selector(selector, args):
     tp = selector[:2]
     attributes = re.findall("\[([^]]+)\]", selector)[0].split(",")
@@ -73,6 +73,11 @@ class Visitor(MineScriptVisitor):
         self.temp_arr = 0           # Unused
         self._commands = []         # List of commands to be added to the current function
         self.datapack_name = name   # Name of the datapack
+        self.get_tags()             # Get all tags from file
+
+    def get_tags(self):
+        for tag in tags.tags:
+            self.memory[tag] = getattr(tags, tag)
 
     def add_cmd(self, command):  # Add a command to the current function
         if self.prefixes != []:

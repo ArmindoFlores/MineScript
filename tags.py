@@ -1,7 +1,9 @@
 def get_id(name, tag):
-    if tag in globals():
+    if tag in tags:
         if name in eval(tag):
             return eval(tag).index(name)
+
+tags = ["blocks", "items"]
 
 blocks = ['minecraft:red_nether_brick_slab',
 	'minecraft:red_nether_brick_stairs',
