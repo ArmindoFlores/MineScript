@@ -90,7 +90,7 @@ def main(file, name):
 def assemble_pack(name, memory, path):
     global commands
     # Setup scoreboard  variables
-    with open(os.path.join(path, name, "data", name, "functions", "setup.mcfunction"), "w") as file:
+    with open(os.path.join(path, name, "data", name, "functions", "_setup.mcfunction"), "w") as file:
         print("Setting up variables")
         for variable in memory[1]:
             if not variable.startswith("_"):
@@ -99,8 +99,8 @@ def assemble_pack(name, memory, path):
                 file.write("scoreboard players set MineScript %s 0\n"%variable)
                 commands += 2
 
-    # Setup "_temp%%" variables
-    with open(os.path.join(path, name, "data", name, "functions", "temp.mcfunction"), "w") as file:
+    # Setup "_var%%" variables
+    with open(os.path.join(path, name, "data", name, "functions", "_vars.mcfunction"), "w") as file:
         print("\nSetting up temporary variables")
         for variable in memory[1]:
             if variable.startswith("_"):
@@ -123,8 +123,8 @@ def assemble_pack(name, memory, path):
         print("Found load function, exporting")
         content = memory[2]["load"]
         with open(os.path.join(path, name, "data", name, "functions", "load.mcfunction"), "w") as file:
-            file.write("function %s:setup\n"%name)
-            file.write("function %s:temp\n"%name)
+            file.write("function %s:_setup\n"%name)
+            file.write("function %s:_vars\n"%name)
             commands += 2
             for line in content:
                 file.write(line+"\n")
@@ -132,14 +132,16 @@ def assemble_pack(name, memory, path):
         del memory[2]["load"]
     else:
         with open(os.path.join(path, name, "data", name, "functions", "load.mcfunction"), "w") as file:
-            file.write("function %s:setup\n"%name)
-            file.write("function %s:temp\n"%name)
+            file.write("function %s:_setup\n"%name)
+            file.write("function %s:_vars\n"%name)
             commands += 2
     
     if "tick" in memory[2]:
         print("Found tick function, exporting")
         content = memory[2]["tick"]
         with open(os.path.join(path, name, "data", name, "functions", "tick.mcfunction"), "w") as file:
+            file.write("function %s:_vars\n"%name)
+            commands += 1
             for line in content:
                 file.write(line+"\n")
                 commands += 1

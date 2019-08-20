@@ -50,6 +50,8 @@ igexpr
     |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr             # igOpIg
     |   igexpr op=('>'|'<'|'>='|'<='|'=='|'!=') expr           # igComparison
     |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') expr               # igOp
+    |   expr op=('>'|'<'|'>='|'<='|'=='|'!=') igexpr           # igComparisonM
+    |   expr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr               # igOpM
     |   '(' igexpr ')'                                         # igParens
     |   '$pos(' expr ',' expr ')'                              # getPos
     |   '$isblock' '(' expr ',' expr ',' expr ')'              # isBlock

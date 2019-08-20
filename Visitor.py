@@ -84,7 +84,7 @@ class Visitor(MineScriptVisitor):
 
     def add_loop(self, tp):  # Add a loop
         self.loops += 1
-        self.loop.append("_%s%i"%(tp, self.loops))
+        self.loop.append(f"_{tp}{self.loops}")
         self.igloops[self.loop[-1]] = []
 
     def pop_loop(self):  # Pop latest loop
@@ -95,13 +95,98 @@ class Visitor(MineScriptVisitor):
 
     def pop_prefix(self):  # Pop latest prefix
         self.prefixes.pop()
+
+    def get_var(self):  # Add a new in-game internal variable and get its name on the scoreboard
+        self.temp += 1
+        name = f"_var{self.temp}"
+        self.igmemory[name] = int
+        return name
+
+    def set_var(self, name, value):  # Set an in-game variable
+        self.add_cmd(f"scoreboard players set MineScript {name} {value}")
+    
+    def igComparison(self, comparison, left, right):  # genexpr (< > <= >= == !=) genexpr
+        if left[1] == "rt":
+            l = self.get_var()
+            self.set_var(l, int(left[0]))
+        elif left[1] == "ig": l = left[0]
+        
+        if right[1] == "rt":
+            r = self.get_var()
+            self.set_var(r, int(right[0]))
+        elif right[1] == "ig": r = right[0]
+
+        result = self.get_var()
+        if comparison == "==": comparison = "="
+        if comparison == "!=":
+            self.add_cmd(f"execute unless score MineScript {l} = MineScript {r} run scoreboard players set MineScript {result} 1")
+        else:
+            self.add_cmd(f"execute if score MineScript {l} {comparison} MineScript {r} run scoreboard players set MineScript {result} 1")
+        return result
+
+    def igOperation(self, operation, left, right, result=None):  # genexpr (+-/*%) genexpr
+        if operation == "^":
+            if result is None: result = self.get_var()
+            
+            if right[1] == "rt" and left[1] == "ig":
+                if right[0] == 0: self.set_var(result, 1)
+                else:
+                    self.add_cmd(f"scoreboard players operation MineScript {result} = MineScript {left[0]}")
+                    for _ in range(right[0]-1):
+                        self.add_cmd(f"scoreboard players operation MineScript {result} *= MineScript {left[0]}")
+            elif right[1] == "ig":
+                r = right[0]
+                if left[1] == "rt":
+                    l = self.get_var()
+                    self.add_cmd(f"scoreboard players set MineScript {l} {int(left[0])}")
+                elif left[1] == "ig": l = left[0]
+                self.add_cmd(f"scoreboard players operation MineScript {result} = MineScript {l}")
+
+                count = self.get_var()
+                negative = self.get_var()
+                self.set_var(negative, -1)
+                
+                self.add_cmd(f"scoreboard players operation MineScript {count} = MineScript {r}")
+                self.add_cmd(f"execute if score MineScript {count} matches ..-1 run scoreboard players operation MineScript {count} *= MineScript {negative}")
+                
+                self.add_cmd(f"scoreboard players remove MineScript {count} 1")
+                loop = "_pow" + str(self.loops+1)
+                self.add_cmd(f"execute if score MineScript {count} matches 1.. run function {self.datapack_name}:{loop}")
+                self.add_loop("pow")
+                self.add_cmd(f"scoreboard players operation MineScript {result} *= MineScript {l}")
+                self.add_cmd(f"scoreboard players remove MineScript {count} 1")
+                self.add_cmd(f"execute if score MineScript {count} matches 1.. run function {self.datapack_name}:{loop}")
+                self.pop_loop()
+                self.add_cmd(f"execute if score MineScript {r} matches 0 run scoreboard players set MineScript {result} 1")
+
+                unit = self.get_var()
+                self.set_var(unit, 1)
+                
+                self.add_cmd(f"execute if score MineScript {r} matches ..-1 run scoreboard players operation MineScript {unit} /= MineScript {result}")
+                self.add_cmd(f"execute if score MineScript {r} matches ..-1 run scoreboard players operation MineScript {result} = MineScript {unit}")                   
+        else:
+            if left[1] == "rt":
+                l = self.get_var()
+                self.set_var(l, int(left[0]))
+            elif left[1] == "ig": l = left[0]
+            
+            if right[1] == "rt":
+                r = self.get_var()
+                self.set_var(r, int(right[0]))
+            elif right[1] == "ig": r = right[0]
+
+            if result is None: result = self.get_var()
+            self.add_cmd(f"scoreboard players operation MineScript {l} {operation}= MineScript {r}")
+            self.add_cmd(f"scoreboard players operation MineScript {result} = MineScript {l}")
+
+        return result
          
     def visitIgAssign(self, ctx):  # Expression of type $var = expression
         name = ctx.ID().getText()
         value = self.visitChildren(ctx)
         if type(value) == int or type(value) == float:
             self.igmemory[name] = type(value)
-            self.add_cmd("scoreboard players set MineScript %s %i"%(name, round(value)))
+            self.add_cmd(f"scoreboard players set MineScript {name} {round(value)}")
         elif type(value) == list:
             self.igmemory[name] = list
         else:
@@ -117,15 +202,15 @@ class Visitor(MineScriptVisitor):
         self.igcalls.append((name2, ctx.start.line))
         
         self.igmemory[name1] = int
-        self.add_cmd("scoreboard players operation MineScript %s = MineScript %s"%(name1, name2))
+        self.add_cmd(f"scoreboard players operation MineScript {name1} = MineScript {name2}")
         return name1
 
     def visitIgAssignUnit(self, ctx):  # Expression of type $var++
         name = ctx.ID().getText()
         self.igcalls.append((name, ctx.start.line))
                          
-        if ctx.op.type == MineScriptParser.USUM: self.add_cmd("scoreboard players add MineScript %s 1"%name)
-        elif ctx.op.type == MineScriptParser.USUB: self.add_cmd("scoreboard players remove MineScript %s 1"%name)
+        if ctx.op.type == MineScriptParser.USUM: self.add_cmd(f"scoreboard players add MineScript {name} 1")
+        elif ctx.op.type == MineScriptParser.USUB: self.add_cmd(f"scoreboard players remove MineScript {name} 1")
         return name
 
     def visitIgAssignOp(self, ctx):  # Expression of type $var (*/+-%)= expression
@@ -137,15 +222,8 @@ class Visitor(MineScriptVisitor):
         if not(type(value) == int or type(value) == float):
             print((error+typeerror5+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, "int", value.__class__.__name__))
             raise Exception("Abort")
-        
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
-        self.add_cmd("scoreboard players set MineScript _temp%i %i"%(self.temp, value))
-        if ctx.op.type == MineScriptParser.PE: self.add_cmd("scoreboard players operation MineScript %s += MineScript _temp%i"%(name, self.temp))
-        elif ctx.op.type == MineScriptParser.SE: self.add_cmd("scoreboard players operation MineScript %s -= MineScript _temp%i"%(name, self.temp))
-        elif ctx.op.type == MineScriptParser.MLE: self.add_cmd("scoreboard players operation MineScript %s *= MineScript _temp%i"%(name, self.temp))
-        elif ctx.op.type == MineScriptParser.MDE: self.add_cmd("scoreboard players operation MineScript %s %%= MineScript _temp%i"%(name, self.temp))
-        elif ctx.op.type == MineScriptParser.DE: self.add_cmd("scoreboard players operation MineScript %s /= MineScript _temp%i"%(name, self.temp))
+    
+        self.igOperation(ctx.op.text[0], (name, "ig"), (value, "rt"), name)
                 
         return name
 
@@ -156,11 +234,7 @@ class Visitor(MineScriptVisitor):
         self.igcalls.append((name1, ctx.start.line))
         self.igcalls.append((name2, ctx.start.line))           
         
-        if ctx.op.type == MineScriptParser.PE: self.add_cmd("scoreboard players operation MineScript %s += MineScript %s"%(name1, name2))
-        elif ctx.op.type == MineScriptParser.SE: self.add_cmd("scoreboard players operation MineScript %s -= MineScript %s"%(name1, name2))
-        elif ctx.op.type == MineScriptParser.MLE: self.add_cmd("scoreboard players operation MineScript %s *= MineScript %s"%(name1, name2))
-        elif ctx.op.type == MineScriptParser.DE: self.add_cmd("scoreboard players operation MineScript %s /= MineScript %s"%(name1, name2))
-        elif ctx.op.type == MineScriptParser.MDE: self.add_cmd("scoreboard players operation MineScript %s %%= MineScript %s"%(name1, name2))
+        self.igOperation(ctx.op.text[0], (name1, "ig"), (name2, "ig"), name1)
 
     def visitIgParens(self, ctx):  # Expression of type ( $expression )
         return self.visit(ctx.igexpr())
@@ -171,45 +245,28 @@ class Visitor(MineScriptVisitor):
 
         self.igcalls.append((name1, ctx.start.line))
         self.igcalls.append((name2, ctx.start.line))
-
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
-        negative = "_temp%i"%self.temp
-        self.add_cmd("scoreboard players set %s -1"%negative)
         
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
-        result = "_temp%i"%self.temp
-        self.add_cmd("scoreboard players operation MineScript _temp%i = MineScript %s"%(self.temp, name1))
-        if ctx.op.type == MineScriptParser.ADD: self.add_cmd("scoreboard players operation MineScript %s += MineScript %s"%(result, name2))
-        elif ctx.op.type == MineScriptParser.SUB: self.add_cmd("scoreboard players operation MineScript %s -= MineScript %s"%(result, name2))
-        elif ctx.op.type == MineScriptParser.MUL: self.add_cmd("scoreboard players operation MineScript %s *= MineScript %s"%(result, name2))
-        elif ctx.op.type == MineScriptParser.DIV: self.add_cmd("scoreboard players operation MineScript %s /= MineScript %s"%(result, name2))
-        elif ctx.op.type == MineScriptParser.MOD: self.add_cmd("scoreboard players operation MineScript %s %%= MineScript %s"%(result, name2))
-        elif ctx.op.type == MineScriptParser.POW:
-            self.temp += 1
-            self.igmemory["_temp%i"%self.temp] = int
-            self.add_cmd("scoreboard players operation MineScript _temp%i = MineScript %s"%(self.temp, name2))
-            self.add_cmd("execute if score MineScript %s matches ..-1 run scoreboard players operation MineScript _temp%i *= MineScript %s"%(name2, self.temp, negative))
+        self.igOperation(ctx.op.text, (name1, "ig"), (name2, "ig"))
+
+        return result
+
+    def visitIgOp(self, ctx, reverse=False):  # Expression of type $var (*/+-%^) expression
+        name = self.visit(ctx.igexpr())
+        value = self.visit(ctx.expr())
+
+        if not(type(value) == int or type(value) == float):
+            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
+            raise Exception("Abort")
+
+        if not reverse: result = self.igOperation(ctx.op.text, (name, "ig"), (value, "rt"))
+        else: result = self.igOperation(ctx.op.text, (value, "rt"), (name, "ig"))
             
-            self.add_cmd("scoreboard players remove MineScript _temp%i 1"%self.temp)
-            self.add_cmd("execute if score MineScript _temp%i matches 1.. run function %s:_pow%i"%(self.temp, self.datapack_name, self.loops+1))
-            self.add_loop("pow")
-            self.add_cmd("scoreboard players operation MineScript %s *= MineScript %s"%(result, name1))
-            self.add_cmd("scoreboard players remove MineScript _temp%i 1"%self.temp)
-            self.add_cmd("execute if score MineScript _temp%i matches 1.. run function %s:_pow%i"%(self.temp, self.datapack_name, self.loops))
-            self.pop_loop()
-            self.add_cmd("execute if score MineScript %s matches 0 run scoreboard players set MineScript %s 1"%(name2, result))
-
-            self.temp += 1
-            self.igmemory["_temp%i"%self.temp] = int
-            self.add_cmd("scoreboard players set MineScript _temp%i 1"%(self.temp))
-            self.add_cmd("execute if score MineScript %s matches ..-1 run scoreboard players operation MineScript _temp%i /= MineScript %s"%(name2, self.temp, result))
-            self.add_cmd("execute if score MineScript %s matches ..-1 run scoreboard players operation MineScript %s = MineScript _temp%i"%(name2, result, self.temp))
-
         return result
 
-    def visitIgOp(self, ctx):  # Expression of type $var (*/+-%^) expression
+    def visitIgOpM(self, ctx):  # Expression of type expression (*/+-%^) $var
+        return self.visitIgOp(ctx, True)
+
+    def visitIgComparison(self, ctx, reverse=False):  # Expression of type $expression (> < <= >= != ==) expression
         name = self.visit(ctx.igexpr())
         value = self.visit(ctx.expr())
 
@@ -217,57 +274,14 @@ class Visitor(MineScriptVisitor):
             print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
             raise Exception("Abort")
         
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = 0
-        self.add_cmd("scoreboard players operation MineScript _temp%i = MineScript %s"%(self.temp, name))
-        result = "_temp%i"%self.temp
-        
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = 0
-        self.add_cmd("scoreboard players set MineScript _temp%i %i"%(self.temp, value))
-        if ctx.op.type == MineScriptParser.ADD: self.add_cmd("scoreboard players operation MineScript %s += MineScript _temp%i"%(result, self.temp))
-        elif ctx.op.type == MineScriptParser.SUB: self.add_cmd("scoreboard players operation MineScript %s -= MineScript _temp%i"%(result, self.temp))
-        elif ctx.op.type == MineScriptParser.MUL: self.add_cmd("scoreboard players operation MineScript %s *= MineScript _temp%i"%(result, self.temp))
-        elif ctx.op.type == MineScriptParser.DIV: self.add_cmd("scoreboard players operation MineScript %s /= MineScript _temp%i"%(result, self.temp))
-        elif ctx.op.type == MineScriptParser.MOD: self.add_cmd("scoreboard players operation MineScript %s %%= MineScript _temp%i"%(result, self.temp))
-        elif ctx.op.type == MineScriptParser.POW:
-            if value != 0:
-                for _ in range(abs(value-1)):
-                    self.add_cmd("scoreboard players operation MineScript _temp%i *= MineScript %s"%(result, name))
-            else:
-                self.add_cmd("scoreboard players set MineScript %s 1"%(result))
-            if value < 0:
-                self.temp += 1
-                self.igmemory["_temp%i"%self.temp] = int
-                r = "_temp%i"%self.temp
-                self.add_cmd("scoreboard players set MineScript %s 1"%r)
-                
-                self.add_cmd("scoreboard players operation MineScript _temp%i /= MineScript _temp%i"%(self.temp, result))
-                self.add_cmd("scoreboard players operation MineScript %s = MineScript %i"%(result, self.temp))
-                
+        if not reverse:
+            result = self.igComparison(ctx.op.text, (name, "ig"), (value, "rt"))
+        else:
+            result = self.igComparison(ctx.op.text, (value, "rt"), (name, "ig"))
         return result
 
-    def visitIgComparison(self, ctx):  # Expression of type $expression (> < <= >= != ==) expression
-        name = self.visit(ctx.igexpr())
-        value = self.visit(ctx.expr())
-
-        if not(type(value) == int or type(value) == float):
-            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
-            raise Exception("Abort")
-        
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = 0
-        self.add_cmd("scoreboard players set MineScript _temp%i %i"%(self.temp, value))
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = 0
-        self.add_cmd("scoreboard players set MineScript _temp%i 0"%self.temp)
-        if ctx.op.type == MineScriptParser.GT: self.add_cmd("execute if score MineScript %s > MineScript _temp%i run scoreboard players set MineScript _temp%i 1"%(name, self.temp-1, self.temp))
-        elif ctx.op.type == MineScriptParser.LT: self.add_cmd("execute if score MineScript %s < MineScript _temp%i run scoreboard players set MineScript _temp%i 1"%(name, self.temp-1, self.temp))
-        elif ctx.op.type == MineScriptParser.GET: self.add_cmd("execute if score MineScript %s >= MineScript _temp%i run scoreboard players set MineScript _temp%i 1"%(name, self.temp-1, self.temp))
-        elif ctx.op.type == MineScriptParser.LET: self.add_cmd("execute if score MineScript %s <= MineScript _temp%i run scoreboard players set MineScript _temp%i 1"%(name, self.temp-1, self.temp))
-        elif ctx.op.type == MineScriptParser.EQ: self.add_cmd("execute if score MineScript %s = MineScript _temp%i run scoreboard players set MineScript _temp%i 1"%(name, self.temp-1, self.temp))
-        elif ctx.op.type == MineScriptParser.DIF: self.add_cmd("execute unless score MineScript %s = MineScript _temp%i run scoreboard players set MineScript _temp%i 1"%(name, self.temp-1, self.temp))
-        return "_temp%i"%self.temp
+    def visitIgComparisonM(self, ctx):  # Expression of type expression (> < <= >= != ==) $expression
+        return self.visitIgComparison(ctx, reverse=True)
 
     def visitExecute(self, ctx):  # Expression of type $execute(execute){ stat }
         execute = str(self.visit(ctx.expr()))
@@ -283,28 +297,21 @@ class Visitor(MineScriptVisitor):
         self.igcalls.append((name1, ctx.start.line))
         self.igcalls.append((name2, ctx.start.line))
         
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = 0
-        self.add_cmd("scoreboard players set MineScript _temp%i 0"%self.temp)
-        if ctx.op.type == MineScriptParser.GT: self.add_cmd("execute if score MineScript %s > MineScript %s run scoreboard players set MineScript _temp%i 1"%(name1, name2, self.temp))
-        elif ctx.op.type == MineScriptParser.LT: self.add_cmd("execute if score MineScript %s < MineScript %s run scoreboard players set MineScript _temp%i 1"%(name1, name2, self.temp))
-        elif ctx.op.type == MineScriptParser.GET: self.add_cmd("execute if score MineScript %s >= MineScript %s run scoreboard players set MineScript _temp%i 1"%(name1, name2, self.temp))
-        elif ctx.op.type == MineScriptParser.LET: self.add_cmd("execute if score MineScript %s <= MineScript %s run scoreboard players set MineScript _temp%i 1"%(name1, name2, self.temp))
-        elif ctx.op.type == MineScriptParser.EQ: self.add_cmd("execute if score MineScript %s = MineScript %s run scoreboard players set MineScript _temp%i 1"%(name1, name2, self.temp))
-        elif ctx.op.type == MineScriptParser.DIF: self.add_cmd("execute unless score MineScript %s = MineScript %s run scoreboard players set MineScript _temp%i 1"%(name1, name2, self.temp))
-        return "_temp%i"%self.temp
+        result = self.igComparison(ctx.op.text, (name1, "ig"), (name2, "ig"))
+        
+        return result
 
     def visitIgIfElse(self, ctx):  # Expression of type $if ($expression) { stat } ($else { stat })?
         name = self.visit(ctx.igexpr())
         nested = False
         length = 0
         
-        self.add_prefix("if score MineScript %s matches 1.."%name)
+        self.add_prefix(f"if score MineScript {name} matches 1..")
         self.visit(ctx.stat(0))
         self.pop_prefix()
         
         if ctx.stat(1) is not None:
-            self.add_prefix("unless score MineScript %s matches 1.."%name)
+            self.add_prefix(f"unless score MineScript {name} matches 1..")
             self.visit(ctx.stat(1))
             self.pop_prefix()
 
@@ -316,21 +323,19 @@ class Visitor(MineScriptVisitor):
             print((error+typeerror3+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), coord.__class__.__name__))
             raise Exception("Abort")
         
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
+        result = self.get_var()
 
-        if coord == 0: self.add_cmd("execute store result score MineScript _temp%i run data get entity %s Pos[0]"%(self.temp, selector))
-        elif coord == 1: self.add_cmd("execute store result score MineScript _temp%i run data get entity %s Pos[1]"%(self.temp, selector))
-        elif coord == 2: self.add_cmd("execute store result score MineScript _temp%i run data get entity %s Pos[2]"%(self.temp, selector))
+        if coord == 0: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[0]")
+        elif coord == 1: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[1]")
+        elif coord == 2: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[2]")
 
-        return "_temp%i"%self.temp
+        return result
 
     def visitGetData(self, ctx):  # Expression of type $getdata(selector, path, scale?)
         selector = str(self.visit(ctx.expr(0)))
         path = str(self.visit(ctx.expr(1)))
 
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
+        result = self.get_var()
 
         if ctx.expr(2) is not None:
             scale = self.visit(ctx.expr(2))
@@ -341,41 +346,39 @@ class Visitor(MineScriptVisitor):
                 print((error+s+end)%(ctx.start.line, self.code[ctx.start.line-1]))
                 raise Exception("Abort")
             
-            self.add_cmd("execute store result score MineScript _temp%i run data get entity %s %s %s"%(self.temp, selector, path, scale))
+            self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} {path} {scale}")
         else:
-            self.add_cmd("execute store result score MineScript _temp%i run data get entity %s %s"%(self.temp, selector, path))
+            self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} {path}")
 
-        return "_temp%i"%self.temp
+        return result
 
     def visitIsBlock(self, ctx):  # Expression of type $isblock(selector, pos, block)
         selector = str(self.visit(ctx.expr(0)))
         relpos = str(self.visit(ctx.expr(1)))
         block = str(self.visit(ctx.expr(2)))
         
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
+        result = self.get_var()
 
-        self.add_cmd("scoreboard players set MineScript _temp%i 0"%self.temp)
-        self.add_cmd("execute at %s if block %s %s run scoreboard players set MineScript _temp%i 1"%(selector, relpos, block, self.temp))
+        self.add_cmd(f"scoreboard players set MineScript {result} 0")
+        self.add_cmd(f"execute at {selector} if block {relpos} {block} run scoreboard players set MineScript {result} 1")
 
-        return "_temp%i"%self.temp
+        return result
 
     def visitAddObj(self, ctx):
         name = str(self.visit(ctx.expr(0)))
         tp = str(self.visit(ctx.expr(1)))
 
-        self.add_cmd("scoreboard objectives add %s %s"%(name, tp))
+        self.add_cmd(f"scoreboard objectives add {name} {tp}")
 
     def visitGetScore(self, ctx):  # Expression of type $getscore(selector, name)
         selector = str(self.visit(ctx.expr(0)))
         name = str(self.visit(ctx.expr(1)))
 
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
+        result = self.get_var()
         
-        self.add_cmd("scoreboard players operation MineScript _temp%i = %s %s"%(self.temp, selector, name))
+        self.add_cmd(f"scoreboard players operation MineScript {result} = {selector} {name}")
         
-        return "_temp%i"%self.temp
+        return result
 
     def visitSetScore(self, ctx):  # Expression of type $setscore(selector, name, value)
         selector = str(self.visit(ctx.expr(0)))
@@ -389,39 +392,37 @@ class Visitor(MineScriptVisitor):
                 print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
                 raise Exception("Abort")
                                 
-            self.temp += 1
-            self.igmemory["_temp%i"%self.temp] = int
+            v = self.get_var()
             
-            self.add_cmd("scoreboard players set MineScript _temp%i %i"%(self.temp, value))
-            self.add_cmd("scoreboard players operation %s %s = MineScript _temp%i"%(selector, name, self.temp))
+            self.add_cmd(f"scoreboard players set MineScript {v} {value}")
+            self.add_cmd(f"scoreboard players operation {selector} {name} = MineScript {v}")
             
         elif ge.igexpr() is not None:
             name2 = self.visit(ge.igexpr())
-            self.add_cmd("scoreboard players operation %s %s = MineScript %s"%(selector, name, name2))
+            self.add_cmd(f"scoreboard players operation {selector} {name} = MineScript {name2}")
 
     def visitAddTag(self, ctx):  # Expression of type $addtag(selector, tag)
         selector = str(self.visit(ctx.expr(0)))
         name = str(self.visit(ctx.expr(1)))
 
-        self.add_cmd("tag %s add %s"%(selector, name))
+        self.add_cmd(f"tag {selector} add {name}")
 
     def visitRemTag(self, ctx):  # Expression of type $remtag(selector, tag)
         selector = str(self.visit(ctx.expr(0)))
         name = str(self.visit(ctx.expr(1)))
 
-        self.add_cmd("tag %s remove %s"%(selector, name))
+        self.add_cmd(f"tag {selector} remove {name}")
 
     def visitHasTag(self, ctx):  # Expression of type $hastag(selector, tag)
         selector = str(self.visit(ctx.expr(0)))
         name = str(self.visit(ctx.expr(1)))
 
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
+        result = self.get_var()
 
-        self.add_cmd("scoreboard players set MineScript _temp%i 0"%self.temp)
-        self.add_cmd("execute as %s at @s[tag=%s] run scoreboard players set MineScript _temp%i 1"%(selector, name, self.temp))
+        self.add_cmd(f"scoreboard players set MineScript {result} 0")
+        self.add_cmd(f"execute as {selector} at @s[tag={name}] run scoreboard players set MineScript {result} 1")
 
-        return "_temp%i"%self.temp
+        return result
 
     def visitCount(self, ctx):  # Expression of type $count(selector)
         selector = str(self.visit(ctx.expr()))
@@ -430,13 +431,12 @@ class Visitor(MineScriptVisitor):
             print((error+valueerror3+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
             raise Exception("Abort")
 
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
+        result = self.get_var()
 
-        self.add_cmd("scoreboard players set MineScript _temp%i 0"%self.temp)
-        self.add_cmd("execute as %s run scoreboard players add MineScript _temp%i 1"%(selector, self.temp))
+        self.add_cmd(f"scoreboard players set MineScript {result} 0")
+        self.add_cmd(f"execute as {selector} run scoreboard players add MineScript {result} 1")
 
-        return "_temp%i"%self.temp
+        return result
 
     def visitIgWhile(self, ctx): # Expression of type $while (genexpr) { stat }
         stats = ctx.stat()
@@ -450,12 +450,12 @@ class Visitor(MineScriptVisitor):
                 print((error+s+end)%(ctx.start.line, self.code[ctx.start.line-1]))
                 raise Exception("Abort")
             
-            self.temp += 1
-            self.igmemory["_temp%i"%self.temp] = int
-            self.add_cmd("scoreboard players set MineScript _temp%i %i"%(self.temp, value))
+            v = self.get_var()
+            self.add_cmd(f"scoreboard players set MineScript {v} {value}")
             expr_n = self.visit(expr.expr())
-            
-            self.add_cmd("execute if score MineScript %s matches 1.. run function %s:_while%i"%(expr_n, self.datapack_name, self.loops+1))
+
+            loop = "_while" + str(self.loops+1)
+            self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
 
             self.add_loop("while")
             self.visit(stats)
@@ -466,14 +466,15 @@ class Visitor(MineScriptVisitor):
             self.igcalls.append((name, ctx.start.line))
             
             expr_n = self.visit(expr.igexpr())
-            
-            self.add_cmd("execute if score MineScript %s matches 1.. run function %s:_while%i"%(expr_n, self.datapack_name, self.loops+1))
+
+            loop = "_while" + str(self.loops+1)
+            self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
 
             self.add_loop("while")
             self.visit(stats)
             expr_n = self.visit(expr.igexpr())
             
-        self.add_cmd("execute if score MineScript %s matches 1.. run function %s:_while%i"%(expr_n, self.datapack_name, self.loops))
+        self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
         self.pop_loop()
         
 
@@ -484,14 +485,15 @@ class Visitor(MineScriptVisitor):
         update = ctx.igForControl().igForUpdate()
         init_n = self.visit(init)
         expr_n = self.visit(expr)
-        
-        self.add_cmd("execute if score MineScript %s matches 1.. run function %s:_for%i"%(expr_n, self.datapack_name, self.loops+1))
+
+        loop = "_for" + str(self.loops+1)
+        self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
         
         self.add_loop("for")
         self.visit(stats)
         self.visit(update)
         expr_n = self.visit(expr)
-        self.add_cmd("execute if score MineScript %s matches 1.. run function %s:_for%i"%(expr_n, self.datapack_name, self.loops))
+        self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
         self.pop_loop()
 
     def visitIgForEntity(self, ctx):  # Expression of type $forentity(selector; new_var) { stat }
@@ -500,31 +502,29 @@ class Visitor(MineScriptVisitor):
         stats = ctx.stat()
 
         self.tag += 1
-        value = add_to_selector(selector, ["limit=1", "tag=!_tag%i"%self.tag])
+        value = add_to_selector(selector, ["limit=1", f"tag=!_tag{self.tag}"])
         self.memory[name] = value
 
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
-        self.add_cmd("scoreboard players set MineScript _temp%i 0"%self.temp)
-        self.add_cmd("execute as %s run scoreboard players add MineScript _temp%i 1"%(selector, self.temp))
+        count_d = self.get_var()
+        self.add_cmd(f"scoreboard players set MineScript {count_d} 0")
+        self.add_cmd(f"execute as {selector} run scoreboard players add MineScript {count_d} 1")
         
-        self.temp += 1
-        self.igmemory["_temp%i"%self.temp] = int
-        self.add_cmd("scoreboard players set MineScript _temp%i 0"%self.temp)
-        self.add_cmd("scoreboard players operation MineScript _temp%i = MineScript _temp%i"%(self.temp, self.temp-1))
-        count = self.temp
-              
-        self.add_cmd("execute if score MineScript _temp%i matches 1.. run function %s:_for%i"%(count, self.datapack_name, self.loops+1))
+        count = self.get_var()
+        self.add_cmd(f"scoreboard players set MineScript {count} 0")
+        self.add_cmd(f"scoreboard players operation MineScript {count} = MineScript {count_d}")
+
+        loop = "_for" + str(self.loops+1)
+        self.add_cmd(f"execute if score MineScript {count} matches 1.. run function {self.datapack_name}:{loop}")
         
         self.add_loop("for")
         self.visit(stats)
-        self.add_cmd("tag %s add _tag%i"%(value, self.tag))
+        self.add_cmd(f"tag {value} add _tag{self.tag}")
 
-        self.add_cmd("scoreboard players remove MineScript _temp%i 1"%count)
-        self.add_cmd("execute if score MineScript _temp%i matches 1.. run function %s:_for%i"%(count, self.datapack_name, self.loops))
+        self.add_cmd(f"scoreboard players remove MineScript {count} 1")
+        self.add_cmd(f"execute if score MineScript {count} matches 1.. run function {self.datapack_name}:{loop}")
         self.pop_loop()
 
-        self.add_cmd("tag %s remove _tag%i"%(selector, self.tag))
+        self.add_cmd(f"tag {selector} remove _tag{self.tag}")
         
     def visitIgPrint(self, ctx):  # Expression of type $print(genexpression,...| COLOR)
         text = []
@@ -802,4 +802,4 @@ class Visitor(MineScriptVisitor):
     def visitSetDisplay(self, ctx):  # Expression of type $setdisplay(var, mode)
         name = self.visit(ctx.igexpr())
         mode = ctx.DSPL_MODE().getText()
-        self.add_cmd("scoreboard objectives setdisplay %s %s"%(mode, name))
+        self.add_cmd(f"scoreboard objectives setdisplay {mode} {name}")
