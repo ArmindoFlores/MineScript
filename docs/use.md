@@ -78,7 +78,9 @@ There are 6 different comparison operators:
 | `!=`		| not equal |
 
 These operators will throw an error when used to compare objects of incompatible types (for example, and array and an integer).
+You can also use `&&` - the AND operator - and `||` - the OR operator - to add different conditions to one if statement.
 
+ 
 ### For loops
 
 For loops are setup similarly to java, using the following syntax:
@@ -111,7 +113,7 @@ while (i < 10) {
 Functions can be used to reduce the ammount of code you need to write in repetitive tasks, or just to help you organize your code better.
 
 ```
-function printsum {
+function printsum() {
 	result = 0
 	for (i=0; i<len(arr); i++) {
 		result += arr[i]
@@ -123,8 +125,21 @@ arr = [2,3,4]
 printsum()  # Output 9 (2 + 3 + 4)
 ```
 
-This function will print out the sum of all elements of an array `arr`, by iterating through all of them. Unfortunately, as of this time, MineScript
-functions cannot return a value, so they are actually more like Pascal procedures than python or java functions.
+This function will print out the sum of all elements of an array `arr`, by iterating through all of them. Functions can also
+return a value, using the keyword `return`.
+
+```
+function sum(a) {
+	result = 0
+	for (i=0; i<len(a); i++) {
+		result += a[i]
+	}
+	return(result)
+}
+
+arr = [2,3,4]
+print(sum(arr))  # Output 9 (2 + 3 + 4)
+```
 
 ## In-game operations
 
@@ -135,7 +150,7 @@ and the functions `tick` and `load` are reserved - `tick` will run every tick (a
 ### Basic arithmetic
 
 ```
-$function load {
+$function load() {
 	$x = 2
 	$y = 3 * $x
 	$z = 1 / (2 + $y)
@@ -149,7 +164,7 @@ because Minecraft `scoreboard` objectives do not support floating-point numbers.
 ### If / Else statements
 
 ```
-$function load {
+$function load() {
 	$x = 3
 	$if($x == 3) {
 		$print("1 + 2 = 3")
@@ -162,7 +177,7 @@ $function load {
 If and else statements function as explained before, with the only difference being you can use in-game variables inside the parentheses:
 
 ```
-$function load {
+$function load() {
 	$x = 2
 	$if ($x > 1) {
 		$print($x, " is greater then 1")
@@ -175,7 +190,7 @@ $function load {
 The syntax for these loops is exactly the same as explained previously:
 
 ```
-$function load {
+$function load() {
 	$for ($i=0; $i<10; $i++) {
 		$print($i) 
 	}
@@ -185,7 +200,7 @@ $function load {
 But there is an additional for loop called `forentity` that iterates through all entities of a certain type:
 
 ```
-$function load {
+$function load() {
 	$forentity ("@e[type=minecraft:zombie]"; zombie) {
 		$tp(zombie, "~ ~10 ~") # Teleports all zombies 10 blocks up
 	}
@@ -201,7 +216,7 @@ to store the selector to the specific entity being targeted in each iteration.
 The syntax for these loops is also the same as explained previously:
 
 ```
-$function load {
+$function load() {
 	$i = 10
     $while($i > 0) {
 		$i--
@@ -217,14 +232,14 @@ This will print out the numbers from 9 to 0.
 Functions are turned into Minecraft function files, and can be used later in your code, or called from within minecraft using `/function yourpack:yourfunction`
 
 ```
-$function reset {
+$function reset() {
 	$a = 0
 	$b = 0
 	$c = 0
 	$print("Reset")
 }
 
-$function load {
+$function load() {
 	$reset()
 }
 ```
@@ -238,7 +253,6 @@ You can still run any Minecraft command normally by using `$mc("your command her
 
 ## Building your datapack
 
-After you've finished writing all your code, you can build your datapack using the command `minescript yourpack.ms`.
-MineScript will create your datapack `.zip` folder inside `/dist/projectname.zip`, provided you have an `.info` file. If
-there is no `.info` file present in the same directory with the same name as your `.ms` file, it will create a datapack named "datapack".
-
+After you've finished writing all your code, you can build your datapack using the command `minescript --file yourpack.ms`.
+MineScript will create your datapack `.zip` folder inside `/dist/datapack.zip`. If you want to change the name of the datapack
+or some if its attributes, use `minescript --help` to get a list of all possible flags you can use.

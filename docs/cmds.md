@@ -18,5 +18,6 @@ simplify their usage, as well as to add some functionality.
 |`$pos`| Return the x, y or z component of the position of an entity | `$pos(selector, index)` | `$pos("@p[name=Alex]", 0)` |
 |`$print`| Print something | `$print(text|COLOR,...)` | `$print("string"|green, 1|aqua, $x|red)` |
 |`$remtag`| Remove a tag from an entity | `$remtag(selector, tag)` | `$remtag("@e[type=minecraft:pig]", "animal")` |
+|`$setdata`| Set the data of an entity | `$setdata(selector, path, value)` | `$setdata("@p", "Pos[0]", $var)` |
 |`$setscore`| Set the score of an entity | `$setscore(selector, score, value)` | `$setscore("@a", "animal", $var)` |
 |`$tp`| Teleports an entity (relative to itself) | `$tp(selector, coords/selector)` | `$tp("@p", "~ ~10 ~")` |
