@@ -210,7 +210,6 @@ class Visitor(MineScriptVisitor):
 
     def igOperation(self, operation, left, right, result=None):  # genexpr (+-/*%) genexpr
         unused = []
-        if result != None: self.set_var(result, 0)
         
         if operation == "^":
             if result is None: result = self.get_var()
