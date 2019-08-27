@@ -15,6 +15,7 @@ stat
     |   'function' ID '(' ID (',' ID)* ')' stat                 # funcDef  
     |   'function' ID '()' stat                                 # funcDef  
     |   'return' '(' expr ')' NEWLINE                           # return
+    |   'include' ID NEWLINE                                    # include
     |   '$function' ID '(' '$' ID (',' '$' ID)* ')' stat        # igFuncDef
     |   '$function' ID '()' stat                                # igFuncDef
     |   '$return' '(' igexpr ')' NEWLINE                        # igReturn

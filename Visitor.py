@@ -12,7 +12,7 @@ approved_attrs = [
     "sort"
     ]
 
-error = f"{Fore.RED}Traceback: Line %i\n%s\n"
+error = f"{Fore.RED}Traceback:\nFile %s, line %i\n%s\n"
 end = f"{Style.RESET_ALL}"
 typeerror1 = "TypeError: Variable '%s' should be of type int or float, not %s"
 typeerror2 = "TypeError: Object of type %s has no length"
@@ -44,8 +44,9 @@ def add_to_selector(selector, args):
     
 
 class Visitor(MineScriptVisitor):
-    def __init__(self, name, code):
+    def __init__(self, name, code, file):
         self.code = code            # The actual code
+        self.file = file            # Filename
         self.datapack_name = name   # Name of the datapack
         self._commands = []         # List of commands to be added to the current function
         self.warnings = []          # List of warnings
@@ -283,7 +284,7 @@ class Visitor(MineScriptVisitor):
             self.add_var(name)
             self.add_cmd(f"scoreboard players set MineScript {name} {round(value)}")
         else:
-            print((error+typeerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
+            print((error+typeerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
             raise Exception("Abort")
         return name
 
@@ -292,9 +293,9 @@ class Visitor(MineScriptVisitor):
         name2 = self.get_var_name(self.visitChildren(ctx))
 
         if not name1.startswith("_") and name1 not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name1} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name1}' referenced without assignement{Style.RESET_ALL}")
         if not name2.startswith("_") and name2 not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name2} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name2}' referenced without assignement{Style.RESET_ALL}")
             
         self.add_var(name1)
         self.add_cmd(f"scoreboard players operation MineScript {name1} = MineScript {name2}")
@@ -307,7 +308,7 @@ class Visitor(MineScriptVisitor):
         name = self.get_var_name(ctx.ID().getText())
         
         if not name.startswith("_") and name not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name}' referenced without assignement{Style.RESET_ALL}")
                          
         if ctx.op.type == MineScriptParser.USUM: self.add_cmd(f"scoreboard players add MineScript {name} 1")
         elif ctx.op.type == MineScriptParser.USUB: self.add_cmd(f"scoreboard players remove MineScript {name} 1")
@@ -318,10 +319,10 @@ class Visitor(MineScriptVisitor):
         value = self.visitChildren(ctx)
 
         if not name.startswith("_") and name not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name}' referenced without assignement{Style.RESET_ALL}")
 
         if not(type(value) == int or type(value) == float):
-            print((error+typeerror5+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, "int", value.__class__.__name__))
+            print((error+typeerror5+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, "int", value.__class__.__name__))
             raise Exception("Abort")
     
         self.igOperation(ctx.op.text[0], (name, "ig"), (value, "rt"), name)
@@ -333,9 +334,9 @@ class Visitor(MineScriptVisitor):
         name2 = self.get_var_name(self.visitChildren(ctx))
 
         if not name1.startswith("_") and name1 not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name1} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name1}' referenced without assignement{Style.RESET_ALL}")
         if not name2.startswith("_") and name2 not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name2} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name2}' referenced without assignement{Style.RESET_ALL}")
         
         self.igOperation(ctx.op.text[0], (name1, "ig"), (name2, "ig"), name1)
         
@@ -349,9 +350,9 @@ class Visitor(MineScriptVisitor):
         name2 = self.get_var_name(self.visit(ctx.igexpr(1)))
 
         if not name1.startswith("_") and name1 not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name1} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name1}' referenced without assignement{Style.RESET_ALL}")
         if not name2.startswith("_") and name2 not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name2} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name2}' referenced without assignement{Style.RESET_ALL}")
         
         result = self.igOperation(ctx.op.text, (name1, "ig"), (name2, "ig"))
 
@@ -365,7 +366,7 @@ class Visitor(MineScriptVisitor):
         value = self.visit(ctx.expr())
 
         if not(type(value) == int or type(value) == float):
-            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
+            print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
             raise Exception("Abort")
 
         if not reverse: result = self.igOperation(ctx.op.text, (name, "ig"), (value, "rt"))
@@ -407,7 +408,7 @@ class Visitor(MineScriptVisitor):
         value = self.visit(ctx.expr())
 
         if not(type(value) == int or type(value) == float):
-            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
+            print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
             raise Exception("Abort")
         
         if not reverse:
@@ -434,9 +435,9 @@ class Visitor(MineScriptVisitor):
         name2 = self.get_var_name(self.visit(ctx.igexpr(1)))
 
         if not name1.startswith("_") and name1 not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name1} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name1}' referenced without assignement{Style.RESET_ALL}")
         if not name2.startswith("_") and name2 not in self.igmemory:
-            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name2} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{name2}' referenced without assignement{Style.RESET_ALL}")
         
         result = self.igComparison(ctx.op.text, (name1, "ig"), (name2, "ig"))
 
@@ -464,7 +465,7 @@ class Visitor(MineScriptVisitor):
         coord = self.visit(ctx.expr(1))
 
         if not type(coord) == int:
-            print((error+typeerror3+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), coord.__class__.__name__))
+            print((error+typeerror3+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), coord.__class__.__name__))
             raise Exception("Abort")
         
         result = self.get_var()
@@ -489,7 +490,7 @@ class Visitor(MineScriptVisitor):
             if type(scale) == int or type(scale) == float:
                 value = int(scale)
             else:
-                print((error+s+end)%(ctx.start.line, self.code[ctx.start.line-1]))
+                print((error+s+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1]))
                 raise Exception("Abort")
             
             self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} {path} {scale}")
@@ -546,7 +547,7 @@ class Visitor(MineScriptVisitor):
             value = self.visit(ge.expr())
 
             if not type(value) == int:
-                print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
+                print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
                 raise Exception("Abort")
                                 
             v = self.get_var()
@@ -587,7 +588,7 @@ class Visitor(MineScriptVisitor):
         selector = str(self.visit(ctx.expr()))
         
         if not selector.startswith("@"):
-            print((error+valueerror3+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
+            print((error+valueerror3+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip()))
             raise Exception("Abort")
 
         result = self.get_var()
@@ -605,7 +606,7 @@ class Visitor(MineScriptVisitor):
             if type(value) == int or type(value) == float or type(value) == bool:
                 value = int(value)
             else:
-                print((error+s+end)%(ctx.start.line, self.code[ctx.start.line-1]))
+                print((error+s+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1]))
                 raise Exception("Abort")
             
             v = self.get_var()
@@ -744,11 +745,11 @@ class Visitor(MineScriptVisitor):
         variables = ctx.genexpr()
         
         if not name in self.igfunctions:
-            print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+            print((error+nameerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name))
             raise Exception("Abort")
 
         if len(variables) != len(self.igfunctionargs[name][0]):
-            print((error+typeerror10+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, len(self.igfunctionargs[name]), len(variables)))
+            print((error+typeerror10+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, len(self.igfunctionargs[name]), len(variables)))
             raise Exception("Abort")
         
         for var in range(len(variables)):
@@ -757,7 +758,7 @@ class Visitor(MineScriptVisitor):
             else:
                 n = self.visit(variables[var])
                 if not n.startswith("_") and n not in self.igmemory:
-                    self.add_warning(f"{Fore.YELLOW}Warning: Variable {n} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+                    self.add_warning(f"{Fore.YELLOW}Warning:\nFile {self.file}, line {ctx.start.line}\nVariable '{n}' referenced without assignement{Style.RESET_ALL}")
                 self.add_cmd(f"scoreboard players operation MineScript {self.igfunctionargs[name][0][var]} = MineScript {n}")
         self.add_cmd(f"function {self.datapack_name}:{name}")
 
@@ -768,7 +769,7 @@ class Visitor(MineScriptVisitor):
             r_value = self.get_var_name(self.visit(ctx.igexpr()))
             self.add_cmd(f"scoreboard players operation MineScript {self.igfunctionreturn[self.igfunc]} = MineScript {r_value}")
         else:
-            print((error+syntaxerror2+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
+            print((error+syntaxerror2+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip()))
             raise Exception("Abort")
 
     def visitIgId(self, ctx):  # Expression of type $var
@@ -788,17 +789,17 @@ class Visitor(MineScriptVisitor):
             if ctx.op.type == MineScriptParser.USUM: self.localmemory[name] += 1
             elif ctx.op.type == MineScriptParser.USUB: self.localmemory[name] -= 1
         except TypeError:
-            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.localmemory[name].__class__.__name__))
+            print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.localmemory[name].__class__.__name__))
             raise Exception("Abort")
         except KeyError:
             try:
                 if ctx.op.type == MineScriptParser.USUM: self.memory[name] += 1
                 elif ctx.op.type == MineScriptParser.USUB: self.memory[name] -= 1
             except TypeError:
-                print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.memory[name].__class__.__name__))
+                print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.memory[name].__class__.__name__))
                 raise Exception("Abort")
             except KeyError:
-                print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+                print((error+nameerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name))
                 raise Exception("Abort")
 
     def visitAssignOp(self, ctx):  # Expression of type var (*/+-%^)= expression
@@ -812,7 +813,7 @@ class Visitor(MineScriptVisitor):
             elif ctx.op.type == MineScriptParser.MDE: self.localmemory[name] %= value
             elif ctx.op.type == MineScriptParser.PWE: self.localmemory[name] = self.localmemory[name] ** value
         except TypeError:
-            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.localmemory[name].__class__.__name__))
+            print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.localmemory[name].__class__.__name__))
             raise Exception("Abort")
         except KeyError:
             try:
@@ -823,10 +824,10 @@ class Visitor(MineScriptVisitor):
                 elif ctx.op.type == MineScriptParser.MDE: self.memory[name] %= value
                 elif ctx.op.type == MineScriptParser.PWE: self.memory[name] = self.memory[name] ** value
             except TypeError:
-                print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.memory[name].__class__.__name__))
+                print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.memory[name].__class__.__name__))
                 raise Exception("Abort")
             except KeyError:
-                print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+                print((error+nameerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name))
                 raise Exception("Abort")
 
     def visitNegative(self, ctx):
@@ -850,7 +851,7 @@ class Visitor(MineScriptVisitor):
         name = ctx.ID().getText()
         args = ctx.expr()
         if len(args) != len(self.functionargs[name]):
-            print((error+typeerror10+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, len(self.functionargs[name]), len(args)))
+            print((error+typeerror10+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, len(self.functionargs[name]), len(args)))
             raise Exception("Abort")
         for arg in range(len(args)):
             self.localmemory[self.functionargs[name][arg]] = self.visit(args[arg])
@@ -861,7 +862,7 @@ class Visitor(MineScriptVisitor):
             self.func = None
             return self.r_value
         else:
-            print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+            print((error+nameerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name))
             raise Exception("Abort")
 
     def visitReturn(self, ctx):
@@ -869,7 +870,7 @@ class Visitor(MineScriptVisitor):
             self.r_value = self.visit(ctx.expr())
             return self.r_value
         else:
-            print((error+syntaxerror2+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
+            print((error+syntaxerror2+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip()))
             raise Exception("Abort")
 
     def visitPrint(self, ctx):  # Expression of type print(expression,...)
@@ -884,7 +885,7 @@ class Visitor(MineScriptVisitor):
         try:
             return len(value)
         except TypeError:
-            print((error+typeerror2+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
+            print((error+typeerror2+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
             raise Exception("Abort")
 
     def visitAbs(self, ctx):  # Expression of type abs(expression)
@@ -892,7 +893,7 @@ class Visitor(MineScriptVisitor):
         try:
             return abs(value)
         except TypeError:
-            print((error+typeerror8+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
+            print((error+typeerror8+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
             raise Exception("Abort")
 
     def visitInt(self, ctx):  # Expression of type int(expression)
@@ -900,10 +901,10 @@ class Visitor(MineScriptVisitor):
         try:
             return int(value)
         except TypeError:
-            print((error+typeerror8+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
+            print((error+typeerror8+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
             raise Exception("Abort")
         except ValueError:
-            print((error+valueerror2+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value))
+            print((error+valueerror2+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value))
             raise Exception("Abort")  
 
     def visitFloat(self, ctx):  # Expression of type float(expression)
@@ -911,10 +912,10 @@ class Visitor(MineScriptVisitor):
         try:
             return float(value)
         except TypeError:
-            print((error+typeerror7+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
+            print((error+typeerror7+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
             raise Exception("Abort")
         except ValueError:
-            print((error+valueerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value))
+            print((error+valueerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value))
             raise Exception("Abort")            
 
     def visitStr(self, ctx):  # Expression of type str(expression)
@@ -936,7 +937,7 @@ class Visitor(MineScriptVisitor):
                 value = float(value)
                 return value
             except ValueError:
-                print((error+syntaxerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
+                print((error+syntaxerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip()))
                 raise Exception("Abort")
 
     def visitConstantArray(self, ctx):  # Expression of type array (=list) [expression,...]
@@ -952,10 +953,10 @@ class Visitor(MineScriptVisitor):
         try:
             return value[index]
         except IndexError:
-            print((error+indexerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), index))
+            print((error+indexerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), index))
             raise Exception("Abort")
         except TypeError:
-            print((error+typeerror3+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), index.__class__.__name__))
+            print((error+typeerror3+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), index.__class__.__name__))
             raise Exception("Abort")
 
     def visitAttribute(self, ctx):  # Expression of type expression.attr
@@ -964,7 +965,7 @@ class Visitor(MineScriptVisitor):
         try:
             return getattr(value, attr)
         except AttributeError:
-            print((error+attributeerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__, attr))
+            print((error+attributeerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__, attr))
             raise Exception("Abort")
 
     def visitAttributeCallEmpty(self, ctx):  # Expression of type expression.attr()
@@ -975,10 +976,10 @@ class Visitor(MineScriptVisitor):
                 raise AttributeError()
             return getattr(value, attr)()
         except AttributeError:
-            print((error+attributeerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__, attr))
+            print((error+attributeerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__, attr))
             raise Exception("Abort")
         except TypeError:
-            print((error+typeerror4+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), getattr(value, attr).__class__.__name__))
+            print((error+typeerror4+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), getattr(value, attr).__class__.__name__))
             raise Exception("Abort")
 
     def visitAttributeCall(self, ctx):  # Expression of type expression.attr(expression)
@@ -990,10 +991,10 @@ class Visitor(MineScriptVisitor):
                 raise AttributeError()
             return getattr(value, attr)(expr)
         except AttributeError:
-            print((error+attributeerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__, attr))
+            print((error+attributeerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__, attr))
             raise Exception("Abort")
         except TypeError:
-            print((error+typeerror4+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), getattr(value, attr).__class__.__name__))
+            print((error+typeerror4+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), getattr(value, attr).__class__.__name__))
             raise Exception("Abort")
 
     def visitId(self, ctx):  # Expression of type var
@@ -1003,7 +1004,7 @@ class Visitor(MineScriptVisitor):
         elif name in self.memory:
             return self.memory[name]
         else:
-            print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+            print((error+nameerror+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name))
             raise Exception("Abort")
         return 0
 
@@ -1018,7 +1019,7 @@ class Visitor(MineScriptVisitor):
             elif ctx.op.type == MineScriptParser.MOD: return left % right
             elif ctx.op.type == MineScriptParser.POW: return left ** right
         except TypeError:
-            print((error+typeerror5+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, left.__class__.__name__, right.__class__.__name__))
+            print((error+typeerror5+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, left.__class__.__name__, right.__class__.__name__))
             raise Exception("Abort")
 
     def visitComparison(self, ctx):  # Expression of type expression (> < <= >= != ==) expression
@@ -1038,7 +1039,7 @@ class Visitor(MineScriptVisitor):
             elif ctx.op.type == MineScriptParser.EQ:
                 return left == right
         except TypeError:
-            print((error+typeerror6+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, left.__class__.__name__, right.__class__.__name__))
+            print((error+typeerror6+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, left.__class__.__name__, right.__class__.__name__))
             raise Exception("Abort")
 
     def visitParens(self, ctx):  # Expression of type (expression)

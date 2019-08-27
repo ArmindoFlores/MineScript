@@ -1,34 +1,12 @@
-from colorama import init, Style, Fore
 from Visitor import Visitor
 from MineScriptParser import MineScriptParser
 import tags
 
 
-error = f"{Fore.RED}Traceback: Line %i\n%s\n"
-end = f"{Style.RESET_ALL}"
-typeerror1 = "TypeError: Variable '%s' should be of type int or float, not %s"
-typeerror2 = "TypeError: Object of type %s has no length"
-typeerror3 = "TypeError: Indices should be of type int, not %s"
-typeerror4 = "TypeError: Object of type %s is not callable"
-typeerror5 = "TypeError: Unsupported operand types for %s: '%s' and '%s'"
-typeerror6 = "TypeError: '%s' not supported between instances of '%s' and '%s'"
-typeerror7 = "TypeError: float() argument must be a string or a number, not '%s'"
-typeerror8 = "TypeError: int() argument must be a string or a number, not '%s'"
-typeerror9 = "TypeError: Invalid type"
-typeerror10 = "TypeError: Function %s() requires %s arguments, but %s were given"
-nameerror = "NameError: Variable '%s' is not defined"
-syntaxerror1 = "SyntaxError: invalid syntax"
-syntaxerror2 = "SyntaxError: 'return' outside of function"
-indexerror = "IndexError: List index %i is out of range"
-attributeerror = "AttributeError: Object of type %s has no attribute %s"
-valueerror1 = "ValueError: Could not convert to float: '%s'"
-valueerror2 = "ValueError: Could not convert to int: '%s'"
-valueerror3 = "ValueError: Selector not formatted correctly"
-
-
 class MVisitor(Visitor):
-    def __init__(self, name, code):
+    def __init__(self, name, code, file):
         self.code = code            # The actual code
+        self.file = file            # Filename
         self.datapack_name = name   # Name of the datapack
         self._commands = []         # List of commands to be added to the current function
         self.warnings = []          # List of warnings
@@ -52,7 +30,7 @@ class MVisitor(Visitor):
         self.loop = []              # Keeps track of loops
         self.prefixes = []          # Keeps track of if/else and execute statements
         self.loops = 0              # Loop ID
-        self.tag = 0                # Tag ID     
+        self.tag = 0                # Tag ID
         
         self.get_tags()             # Get all tags from file
          
@@ -280,6 +258,9 @@ class MVisitor(Visitor):
         if name.startswith("_"): self.mark_unused(name)
 
     def visitCommand(self, ctx):  # Expression of type $mc(expression)
+        self.visitChildren(ctx)
+
+    def visitPrint(self, ctx):
         self.visitChildren(ctx)
         
 del Visitor
