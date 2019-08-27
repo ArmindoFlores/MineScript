@@ -255,4 +255,4 @@ You can still run any Minecraft command normally by using `$mc("your command her
 
 After you've finished writing all your code, you can build your datapack using the command `minescript --file yourpack.ms`.
 MineScript will create your datapack `.zip` folder inside `/dist/datapack.zip`. If you want to change the name of the datapack
-or some iõf its attributes, use `minescript --help` to get a list of all possible flags you can use.
+or some of its attributes, use `minescript --help` to get a list of all possible flags you can use.
