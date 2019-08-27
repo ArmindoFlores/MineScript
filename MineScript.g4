@@ -14,10 +14,10 @@ stat
     |   'if' '(' expr ')' stat ('else' stat)?                   # ifElse
     |   'function' ID '(' ID (',' ID)* ')' stat                 # funcDef  
     |   'function' ID '()' stat                                 # funcDef  
-    |   'return' expr NEWLINE                                   # return
+    |   'return' '(' expr ')' NEWLINE                           # return
     |   '$function' ID '(' '$' ID (',' '$' ID)* ')' stat        # igFuncDef
     |   '$function' ID '()' stat                                # igFuncDef
-    |   '$return' igexpr NEWLINE                                # igReturn
+    |   '$return' '(' igexpr ')' NEWLINE                        # igReturn
     |   '$if' '(' igexpr ')' stat ('$else' stat)?               # igIfElse
     |   '$setdisplay' '(' igexpr ',' DSPL_MODE ')' NEWLINE      # setDisplay
     |   '$for' igForControl stat                                # igFor
