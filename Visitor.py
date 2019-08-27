@@ -1,9 +1,9 @@
-import re
-import pickle
+from re import findall
 from colorama import init, Style, Fore
 from MineScriptVisitor import MineScriptVisitor
 from MineScriptParser import MineScriptParser
 import tags
+
 
 approved_attrs = [
     "append",
@@ -14,46 +14,28 @@ approved_attrs = [
 
 error = f"{Fore.RED}Traceback: Line %i\n%s\n"
 end = f"{Style.RESET_ALL}"
-
 typeerror1 = "TypeError: Variable '%s' should be of type int or float, not %s"
-
 typeerror2 = "TypeError: Object of type %s has no length"
-
 typeerror3 = "TypeError: Indices should be of type int, not %s"
-
 typeerror4 = "TypeError: Object of type %s is not callable"
-
 typeerror5 = "TypeError: Unsupported operand types for %s: '%s' and '%s'"
-
 typeerror6 = "TypeError: '%s' not supported between instances of '%s' and '%s'"
-
 typeerror7 = "TypeError: float() argument must be a string or a number, not '%s'"
-
-typeerror8 = "TypeError: int() argument must be a string or a number, not '%s'"
-
+typeerror8 = "TypeError: Function argument must be a string or a number, not '%s'"
 typeerror9 = "TypeError: Invalid type"
-
 typeerror10 = "TypeError: Function %s() requires %s arguments, but %s were given"
-
 nameerror = "NameError: Variable '%s' is not defined"
-
 syntaxerror1 = "SyntaxError: invalid syntax"
-
 syntaxerror2 = "SyntaxError: 'return' outside of function"
-
 indexerror = "IndexError: List index %i is out of range"
-
 attributeerror = "AttributeError: Object of type %s has no attribute %s"
-
 valueerror1 = "ValueError: Could not convert to float: '%s'"
-
 valueerror2 = "ValueError: Could not convert to int: '%s'"
-
 valueerror3 = "ValueError: Selector not formatted correctly"
 
 def add_to_selector(selector, args):
     tp = selector[:2]
-    attributes = re.findall("\[([^]]+)\]", selector)[0].split(",")
+    attributes = findall("\[([^]]+)\]", selector)[0].split(",")
     attributes = [attr.strip() for attr in attributes]
     for arg in args:
         if arg not in attributes:
@@ -64,28 +46,72 @@ def add_to_selector(selector, args):
 class Visitor(MineScriptVisitor):
     def __init__(self, name, code):
         self.code = code            # The actual code
+        self.datapack_name = name   # Name of the datapack
+        self._commands = []         # List of commands to be added to the current function
+        self.warnings = []          # List of warnings
+        
         self.memory = {}            # Stores variables
         self.localmemory = {}       # Stores local variables
-        self.func = None            # Current function
-        self.igfunc = None          # Current igfunction
-        self.r_value = None         # Stores the return variable of the current function
-        self.ig_r_value = None      # Stores the return variable of the current igfunc
         self.functionargs = {}      # Stores the args a function takes
+        self.func = None            # Current function
+        self.r_value = None         # Stores the return variable of the current function
+
+        self.igmemory = []          # Stores the in-game variable names
         self.igfunctionargs = {}    # Stores the args an igfunction takes
+        self.igfunctionreturn = {}  # Stores the name of the return variable of a function
         self.igfunctions = {}       # Stores the functions to be turned into .mcfunction files
-        self.igmemory = {}          # Stores the in-game variable names and types 
-        self.igcalls = []           # Keeps track of variable use to raise a warning when they're not defined
+        self.igfunc = None          # Current igfunction
+
+        self.vars = []              # Stores all the temporary variables currently in use
+        self.nreusable = []         # Stores all non reusable variables
         self.igloops = {}           # Stores the loops to be turned into .mcfunction files
         self.loop = []              # Keeps track of loops
         self.prefixes = []          # Keeps track of if/else and execute statements
         self.loops = 0              # Loop ID
-        self.temp = 0               # Temp variable ID
-        self.tag = 0                # Tag ID
-        self._commands = []         # List of commands to be added to the current function
-        self.datapack_name = name   # Name of the datapack
+        self.tag = 0                # Tag ID     
+        
         self.get_tags()             # Get all tags from file
 
-    def get_tags(self):
+    def add_var(self, name):  # Add a new in-game variable
+        if name not in self.igmemory:
+            self.igmemory.append(name)
+
+    def mark_unused(self, var):  # Mark an in-game variable as unused
+        name = int(var[4:])
+        if var not in self.nreusable and name in self.vars:
+            self.vars.remove(name)
+
+    def mark_not_reusable(self, var):  # Mark an in-game variable as not reusable
+        if var not in self.nreusable:
+            self.nreusable.append(var)
+
+    def get_var(self):  # Generate and return a new temporary variable
+        n = self.get_next_var_id()
+        name = f"_var{n}"
+        self.add_var(name)
+        self.vars.append(n)
+        return name
+
+    def get_next_var_id(self):  # Get the id of the next available variable
+        if len(self.vars):
+            for i in range(len(self.vars)):
+                if self.vars[i] != i:
+                    self.vars.insert(i, i)
+                    return i
+            return len(self.vars)
+        return 0
+
+    def add_func_arg(self, func, var, arg):
+        if var not in self.igfunctionargs[func][0]:
+            self.igfunctionargs[func][0].append(var)
+        if var not in self.igfunctionargs[func][1]:
+            self.igfunctionargs[func][1].append(arg)
+
+    def add_warning(self, warning):  # Add a warning
+        if warning not in self.warnings:
+            self.warnings.append(warning)
+
+    def get_tags(self):  # Get and load all tags
         for tag in tags.tags:
             self.memory[tag] = tags.tags[tag]
 
@@ -122,39 +148,70 @@ class Visitor(MineScriptVisitor):
 
     def pop_prefix(self):  # Pop latest prefix
         self.prefixes.pop()
-
-    def get_var(self):  # Add a new in-game internal variable and get its name on the scoreboard
-        self.temp += 1
-        name = f"_var{self.temp}"
-        self.add_igvar(name)
-        return name
-
-    def add_igvar(self, name):  # Add a new ingame variable
-        self.igmemory[name] = int
  
     def set_var(self, name, value):  # Set an in-game variable
         self.add_cmd(f"scoreboard players set MineScript {name} {value}")
-    
-    def igComparison(self, comparison, left, right):  # genexpr (< > <= >= == !=) genexpr
+
+    def igBoolOp(self, operation, left, right):
+        unused = []
+        
         if left[1] == "rt":
             l = self.get_var()
+            unused.append(l)
             self.set_var(l, int(left[0]))
         elif left[1] == "ig": l = left[0]
         
         if right[1] == "rt":
             r = self.get_var()
+            unused.append(r)
+            self.set_var(r, int(right[0]))
+        elif right[1] == "ig": r = right[0]
+
+        result = self.get_var()
+        self.set_var(result, 0)
+        if operation == "&&":
+            self.add_cmd(f"execute if score MineScript {l} matches 1.. if score MineScript {r} matches 1.. run scoreboard players set MineScript {result} 1")
+        elif operation == "||":
+            self.add_cmd(f"execute if score MineScript {l} matches 1.. run scoreboard players set MineScript {result} 1")
+            self.add_cmd(f"execute if score MineScript {r} matches 1.. run scoreboard players set MineScript {result} 1")
+            
+        for var in unused:
+            self.mark_unused(var)
+            
+        return result
+
+    def igComparison(self, comparison, left, right):  # genexpr (< > <= >= == !=) genexpr
+        unused = []
+        if left[1] == "rt":
+            l = self.get_var()
+            unused.append(l)
+            self.set_var(l, int(left[0]))
+        elif left[1] == "ig": l = left[0]
+        
+        if right[1] == "rt":
+            r = self.get_var()
+            unused.append(r)
             self.set_var(r, int(right[0]))
         elif right[1] == "ig": r = right[0]
 
         result = self.get_var()
         if comparison == "==": comparison = "="
         if comparison == "!=":
+            self.set_var(result, 0)
             self.add_cmd(f"execute unless score MineScript {l} = MineScript {r} run scoreboard players set MineScript {result} 1")
         else:
+            self.set_var(result, 0)
             self.add_cmd(f"execute if score MineScript {l} {comparison} MineScript {r} run scoreboard players set MineScript {result} 1")
+
+        for var in unused:
+            self.mark_unused(var)
+                             
         return result
 
     def igOperation(self, operation, left, right, result=None):  # genexpr (+-/*%) genexpr
+        unused = []
+        if result != None: self.set_var(result, 0)
+        
         if operation == "^":
             if result is None: result = self.get_var()
             
@@ -168,12 +225,15 @@ class Visitor(MineScriptVisitor):
                 r = right[0]
                 if left[1] == "rt":
                     l = self.get_var()
+                    unused.append(l)
                     self.add_cmd(f"scoreboard players set MineScript {l} {int(left[0])}")
                 elif left[1] == "ig": l = left[0]
                 self.add_cmd(f"scoreboard players operation MineScript {result} = MineScript {l}")
 
                 count = self.get_var()
                 negative = self.get_var()
+                unused.append(count)
+                unused.append(negative)
                 self.set_var(negative, -1)
                 
                 self.add_cmd(f"scoreboard players operation MineScript {count} = MineScript {r}")
@@ -190,6 +250,7 @@ class Visitor(MineScriptVisitor):
                 self.add_cmd(f"execute if score MineScript {r} matches 0 run scoreboard players set MineScript {result} 1")
 
                 unit = self.get_var()
+                unused.append(unit)
                 self.set_var(unit, 1)
                 
                 self.add_cmd(f"execute if score MineScript {r} matches ..-1 run scoreboard players operation MineScript {unit} /= MineScript {result}")
@@ -197,11 +258,13 @@ class Visitor(MineScriptVisitor):
         else:
             if left[1] == "rt":
                 l = self.get_var()
+                unused.append(l)
                 self.set_var(l, int(left[0]))
             elif left[1] == "ig": l = left[0]
             
             if right[1] == "rt":
                 r = self.get_var()
+                unused.append(r)
                 self.set_var(r, int(right[0]))
             elif right[1] == "ig": r = right[0]
 
@@ -209,13 +272,16 @@ class Visitor(MineScriptVisitor):
             self.add_cmd(f"scoreboard players operation MineScript {result} = MineScript {l}")
             self.add_cmd(f"scoreboard players operation MineScript {result} {operation}= MineScript {r}")
 
+        for var in unused:
+            self.mark_unused(var)
+
         return result
          
     def visitIgAssign(self, ctx):  # Expression of type $var = expression
         name = ctx.ID().getText()
         value = self.visitChildren(ctx)
         if type(value) == int or type(value) == float:
-            self.add_igvar(name)
+            self.add_var(name)
             self.add_cmd(f"scoreboard players set MineScript {name} {round(value)}")
         else:
             print((error+typeerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
@@ -226,17 +292,23 @@ class Visitor(MineScriptVisitor):
         name1 = self.get_var_name(ctx.ID().getText())
         name2 = self.get_var_name(self.visitChildren(ctx))
 
-        if not name1.startswith("_"): self.igcalls.append((name1, ctx.start.line))
-        if not name2.startswith("_"): self.igcalls.append((name2, ctx.start.line))
-        
-        self.add_igvar(name1)
+        if not name1.startswith("_") and name1 not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name1} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+        if not name2.startswith("_") and name2 not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name2} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+            
+        self.add_var(name1)
         self.add_cmd(f"scoreboard players operation MineScript {name1} = MineScript {name2}")
+        
+        if name2.startswith("_"): self.mark_unused(name2)
+        
         return name1
 
     def visitIgAssignUnit(self, ctx):  # Expression of type $var++
         name = self.get_var_name(ctx.ID().getText())
         
-        if not name.startswith("_"): self.igcalls.append((name, ctx.start.line))
+        if not name.startswith("_") and name not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
                          
         if ctx.op.type == MineScriptParser.USUM: self.add_cmd(f"scoreboard players add MineScript {name} 1")
         elif ctx.op.type == MineScriptParser.USUB: self.add_cmd(f"scoreboard players remove MineScript {name} 1")
@@ -246,7 +318,8 @@ class Visitor(MineScriptVisitor):
         name = self.get_var_name(ctx.ID().getText())
         value = self.visitChildren(ctx)
 
-        if not name.startswith("_"): self.igcalls.append((name, ctx.start.line))
+        if not name.startswith("_") and name not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
 
         if not(type(value) == int or type(value) == float):
             print((error+typeerror5+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, "int", value.__class__.__name__))
@@ -260,26 +333,35 @@ class Visitor(MineScriptVisitor):
         name1 = self.get_var_name(ctx.ID().getText())
         name2 = self.get_var_name(self.visitChildren(ctx))
 
-        if not name1.startswith("_"): self.igcalls.append((name1, ctx.start.line))
-        if not name2.startswith("_"): self.igcalls.append((name2, ctx.start.line))           
+        if not name1.startswith("_") and name1 not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name1} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+        if not name2.startswith("_") and name2 not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name2} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
         
         self.igOperation(ctx.op.text[0], (name1, "ig"), (name2, "ig"), name1)
+        
+        if name2.startswith("_"): self.mark_unused(name2)
 
     def visitIgParens(self, ctx):  # Expression of type ( $expression )
         return self.visit(ctx.igexpr())
 
-    def visitIgOpIg(self, ctx):  # Expression of type $var (*/+-%^) $expression
+    def visitIgOpIg(self, ctx):  # Expression of type $expression (*/+-%^) $expression
         name1 = self.get_var_name(self.visit(ctx.igexpr(0)))
         name2 = self.get_var_name(self.visit(ctx.igexpr(1)))
 
-        if not name1.startswith("_"): self.igcalls.append((name1, ctx.start.line))
-        if not name2.startswith("_"): self.igcalls.append((name2, ctx.start.line))
+        if not name1.startswith("_") and name1 not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name1} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+        if not name2.startswith("_") and name2 not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name2} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
         
         result = self.igOperation(ctx.op.text, (name1, "ig"), (name2, "ig"))
 
+        if name1.startswith("_"): self.mark_unused(name1)
+        if name2.startswith("_"): self.mark_unused(name2)
+
         return result
 
-    def visitIgOp(self, ctx, reverse=False):  # Expression of type $var (*/+-%^) expression
+    def visitIgOp(self, ctx, reverse=False):  # Expression of type $expression (*/+-%^) expression
         name = self.get_var_name(self.visit(ctx.igexpr()))
         value = self.visit(ctx.expr())
 
@@ -289,11 +371,37 @@ class Visitor(MineScriptVisitor):
 
         if not reverse: result = self.igOperation(ctx.op.text, (name, "ig"), (value, "rt"))
         else: result = self.igOperation(ctx.op.text, (value, "rt"), (name, "ig"))
+
+        if name.startswith("_"): self.mark_unused(name)
             
         return result
 
     def visitIgOpM(self, ctx):  # Expression of type expression (*/+-%^) $var
         return self.visitIgOp(ctx, True)
+
+    def visitIgNot(self, ctx):  # Expression of type !$expression
+        name = self.get_var_name(self.visit(ctx.igexpr()))
+        result = self.get_var()
+        self.set_var(result, 0)
+        self.add_cmd(f"execute unless score MineScript {name} matches 1.. run scoreboard players set MineScript {result} 1")
+
+        if name.startswith("_"): self.mark_unused(name)
+        
+        return result
+
+    def visitIgBoolOp(self, ctx):  # Expression of type genexpr &&/|| genexpr
+        if len(ctx.igexpr()) == 1:
+            expr1 = self.visit(ctx.igexpr(0)), "ig"
+            expr2 = self.visit(ctx.expr()), "rt"
+        else:
+            expr1 = self.visit(ctx.igexpr(0)), "ig"
+            expr2 = self.visit(ctx.igexpr(1)), "ig"
+        result = self.igBoolOp(ctx.op.text, expr1, expr2)
+
+        if expr1[0].startswith("_"): self.mark_unused(expr1[0])
+        if len(ctx.igexpr()) > 1 and expr2[0].startswith("_"): self.mark_unused(expr2[0])
+        
+        return result
 
     def visitIgComparison(self, ctx, reverse=False):  # Expression of type $expression (> < <= >= != ==) expression
         name = self.get_var_name(self.visit(ctx.igexpr()))
@@ -307,6 +415,9 @@ class Visitor(MineScriptVisitor):
             result = self.igComparison(ctx.op.text, (name, "ig"), (value, "rt"))
         else:
             result = self.igComparison(ctx.op.text, (value, "rt"), (name, "ig"))
+
+        if name.startswith("_"): self.mark_unused(name)
+        
         return result
 
     def visitIgComparisonM(self, ctx):  # Expression of type expression (> < <= >= != ==) $expression
@@ -323,17 +434,20 @@ class Visitor(MineScriptVisitor):
         name1 = self.get_var_name(self.visit(ctx.igexpr(0)))
         name2 = self.get_var_name(self.visit(ctx.igexpr(1)))
 
-        if not name1.startswith("_"): self.igcalls.append((name1, ctx.start.line))
-        if not name2.startswith("_"): self.igcalls.append((name2, ctx.start.line))
+        if not name1.startswith("_") and name1 not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name1} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+        if not name2.startswith("_") and name2 not in self.igmemory:
+            self.add_warning(f"{Fore.YELLOW}Warning: Variable {name2} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
         
         result = self.igComparison(ctx.op.text, (name1, "ig"), (name2, "ig"))
+
+        if name1.startswith("_"): self.mark_unused(name1)
+        if name2.startswith("_"): self.mark_unused(name2)
         
         return result
 
     def visitIgIfElse(self, ctx):  # Expression of type $if ($expression) { stat } ($else { stat })?
         name = self.get_var_name(self.visit(ctx.igexpr()))
-        nested = False
-        length = 0
         
         self.add_prefix(f"if score MineScript {name} matches 1..")
         self.visit(ctx.stat(0))
@@ -344,6 +458,8 @@ class Visitor(MineScriptVisitor):
             self.visit(ctx.stat(1))
             self.pop_prefix()
 
+        if name.startswith("_"): self.mark_unused(name)
+
     def visitGetPos(self, ctx):  # Expression of type $pos(selector, index)
         selector = str(self.visit(ctx.expr(0)))
         coord = self.visit(ctx.expr(1))
@@ -353,6 +469,7 @@ class Visitor(MineScriptVisitor):
             raise Exception("Abort")
         
         result = self.get_var()
+        self.set_var(result, 0)
 
         if coord == 0: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[0]")
         elif coord == 1: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[1]")
@@ -365,6 +482,7 @@ class Visitor(MineScriptVisitor):
         path = str(self.visit(ctx.expr(1)))
 
         result = self.get_var()
+        self.set_var(result, 0)
 
         if ctx.expr(2) is not None:
             scale = self.visit(ctx.expr(2))
@@ -381,14 +499,26 @@ class Visitor(MineScriptVisitor):
 
         return result
 
+    def visitSetData(self, ctx):
+        selector = str(self.visit(ctx.expr(0)))
+        selector = add_to_selector(selector, ["limit=1"])
+        path = str(self.visit(ctx.expr(1)))
+
+        if ctx.genexpr().expr() is not None:
+            value = self.visit(ctx.genexpr().expr())
+            self.add_cmd(f"data modify entity {selector} {path} set value {value}")
+        else:
+            name = self.get_var_name(self.visit(ctx.genexpr().igexpr()))
+            self.add_cmd(f"execute store result entity {selector} {path} double 1 run scoreboard players get MineScript {name}")
+            if name.startswith("_"): self.mark_unused(name)
+
     def visitIsBlock(self, ctx):  # Expression of type $isblock(selector, pos, block)
         selector = str(self.visit(ctx.expr(0)))
         relpos = str(self.visit(ctx.expr(1)))
         block = str(self.visit(ctx.expr(2)))
         
         result = self.get_var()
-
-        self.add_cmd(f"scoreboard players set MineScript {result} 0")
+        self.set_var(result, 0)
         self.add_cmd(f"execute at {selector} if block {relpos} {block} run scoreboard players set MineScript {result} 1")
 
         return result
@@ -403,8 +533,7 @@ class Visitor(MineScriptVisitor):
         selector = str(self.visit(ctx.expr(0)))
         name = str(self.visit(ctx.expr(1)))
 
-        result = self.get_var()
-        
+        result = self.get_var()        
         self.add_cmd(f"scoreboard players operation MineScript {result} = {selector} {name}")
         
         return result
@@ -429,6 +558,7 @@ class Visitor(MineScriptVisitor):
         elif ge.igexpr() is not None:
             name2 = self.get_var_name(self.visit(ge.igexpr()))
             self.add_cmd(f"scoreboard players operation {selector} {name} = MineScript {name2}")
+            if name2.startswith("_"): self.mark_unused(name2)
 
     def visitAddTag(self, ctx):  # Expression of type $addtag(selector, tag)
         selector = str(self.visit(ctx.expr(0)))
@@ -447,6 +577,7 @@ class Visitor(MineScriptVisitor):
         name = str(self.visit(ctx.expr(1)))
 
         result = self.get_var()
+        self.set_var(result, 0)
 
         self.add_cmd(f"scoreboard players set MineScript {result} 0")
         self.add_cmd(f"execute as {selector} at @s[tag={name}] run scoreboard players set MineScript {result} 1")
@@ -461,8 +592,7 @@ class Visitor(MineScriptVisitor):
             raise Exception("Abort")
 
         result = self.get_var()
-
-        self.add_cmd(f"scoreboard players set MineScript {result} 0")
+        self.set_var(result, 0)
         self.add_cmd(f"execute as {selector} run scoreboard players add MineScript {result} 1")
 
         return result
@@ -488,24 +618,19 @@ class Visitor(MineScriptVisitor):
 
             self.add_loop("while")
             self.visit(stats)
-            expr_n = self.visit(expr.expr())
             
-        elif expr.igexpr() is not None:
-            name = self.get_var_name(self.visit(expr.igexpr()))
-            self.igcalls.append((name, ctx.start.line))
-            
-            expr_n = self.visit(expr.igexpr())
+        elif expr.igexpr() is not None:           
+            expr_n = self.get_var_name(self.visit(expr.igexpr()))
 
             loop = "_while" + str(self.loops+1)
             self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
-
             self.add_loop("while")
             self.visit(stats)
             expr_n = self.visit(expr.igexpr())
             
         self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
         self.pop_loop()
-        
+        if expr.igexpr() is not None and expr_n.startswith("_"): self.mark_unused(expr_n)        
 
     def visitIgFor(self, ctx):  # Expression of type $for ($forInit; $forTest; $forUpdate) { stat }
         stats = ctx.stat()
@@ -524,8 +649,11 @@ class Visitor(MineScriptVisitor):
         expr_n = self.visit(expr)
         self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
         self.pop_loop()
+        if expr_n.startswith("_"): self.mark_unused(expr_n) 
 
     def visitIgForEntity(self, ctx):  # Expression of type $forentity(selector; new_var) { stat }
+        unused = []
+        
         selector = str(self.visit(ctx.expr()))
         name = ctx.ID().getText()
         stats = ctx.stat()
@@ -535,10 +663,12 @@ class Visitor(MineScriptVisitor):
         self.memory[name] = value
 
         count_d = self.get_var()
+        unused.append(count_d)
         self.add_cmd(f"scoreboard players set MineScript {count_d} 0")
         self.add_cmd(f"execute as {selector} run scoreboard players add MineScript {count_d} 1")
         
         count = self.get_var()
+        unused.append(count)
         self.add_cmd(f"scoreboard players set MineScript {count} 0")
         self.add_cmd(f"scoreboard players operation MineScript {count} = MineScript {count_d}")
 
@@ -554,6 +684,19 @@ class Visitor(MineScriptVisitor):
         self.pop_loop()
 
         self.add_cmd(f"tag {selector} remove _tag{self.tag}")
+
+        for var in unused:
+            self.mark_unused(var)
+            
+    def visitSetDisplay(self, ctx):  # Expression of type $setdisplay(var, mode)
+        name = self.get_var_name(self.visit(ctx.igexpr()))
+        mode = ctx.DSPL_MODE().getText()
+        self.add_cmd(f"scoreboard objectives setdisplay {mode} {name}")
+        if name.startswith("_"): self.mark_unused(name)
+
+    def visitCommand(self, ctx):  # Expression of type $mc(expression)
+        exp = str(self.visit(ctx.expr()))
+        self.add_cmd(exp)
         
     def visitIgPrint(self, ctx):  # Expression of type $print(genexpression,...| COLOR)
         text = []
@@ -566,8 +709,10 @@ class Visitor(MineScriptVisitor):
                 value = str(self.visit(e.expr()))
                 text.append("{\"text\":\"%s\",\"color\":\"%s\"}"%(value, color))
             elif e.igexpr() is not None:
-                name = str(self.get_var_name(self.visit(e.igexpr())))
+                name = self.get_var_name(self.visit(e.igexpr()))
                 text.append("{\"score\":{\"name\":\"MineScript\",\"objective\":\"%s\"},\"color\":\"%s\"}"%(name, color))
+                if name.startswith("_"): self.mark_unused(name)
+                
         self.add_cmd("tellraw @a ["+','.join(text)+"]")
 
     def visitTeleport(self, ctx):  # Expression of type $tp(selector, pos)
@@ -575,15 +720,20 @@ class Visitor(MineScriptVisitor):
         pos = str(self.visit(ctx.expr(1)))
         self.add_cmd(f"execute as {selector} at @s run tp @s {pos}")
 
-    def visitIgFuncDef(self, ctx):  # Expression of type $function func { stat }
+    def visitIgFuncDef(self, ctx):  # Expression of type $function func { stat }        
         name = ctx.ID(0).getText()
         stats = ctx.stat()
         args = ctx.ID()[1:]
         self.igfunctionargs[name] = [[], []]
+        r_var = self.get_var()
+        self.mark_not_reusable(r_var)
+        self.igfunctionreturn[name] = r_var
+        
         for arg in args:
             var = self.get_var()
-            self.igfunctionargs[name][0].append(var)
-            self.igfunctionargs[name][1].append(arg.getText())
+            self.mark_not_reusable(var)
+            self.add_func_arg(name, var, arg.getText())
+            
         self.igfunc = name
         self.visit(stats)
         self.igfunc = None
@@ -593,19 +743,34 @@ class Visitor(MineScriptVisitor):
     def visitIgFuncCall(self, ctx):  # Expression of type $func()
         name = ctx.ID().getText()
         variables = ctx.genexpr()
-
+        
         if not name in self.igfunctions:
-                print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
-                raise Exception("Abort")
+            print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+            raise Exception("Abort")
+
+        if len(variables) != len(self.igfunctionargs[name][0]):
+            print((error+typeerror10+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, len(self.igfunctionargs[name]), len(variables)))
+            raise Exception("Abort")
         
         for var in range(len(variables)):
             if variables[var].expr():
                 self.set_var(self.igfunctionargs[name][0][var], int(self.visit(variables[var])))
             else:
-                n = variables[var].getText()[1:]
-                self.igcalls.append((n, ctx.start.line))
-                self.add_cmd(f"scoreboard players operation set MineScript {self.igfunctionargs[name][0][var]} = MineScript {n}")
+                n = self.visit(variables[var])
+                if not n.startswith("_") and n not in self.igmemory:
+                    self.add_warning(f"{Fore.YELLOW}Warning: Variable {n} referenced without assignement in line {ctx.start.line}{Style.RESET_ALL}")
+                self.add_cmd(f"scoreboard players operation MineScript {self.igfunctionargs[name][0][var]} = MineScript {n}")
         self.add_cmd(f"function {self.datapack_name}:{name}")
+
+        return self.igfunctionreturn[name]
+
+    def visitIgReturn(self, ctx):
+        if self.igfunc:
+            r_value = self.get_var_name(self.visit(ctx.igexpr()))
+            self.add_cmd(f"scoreboard players operation MineScript {self.igfunctionreturn[self.igfunc]} = MineScript {r_value}")
+        else:
+            print((error+syntaxerror2+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
+            raise Exception("Abort")
 
     def visitIgId(self, ctx):  # Expression of type $var
         name = self.get_var_name(ctx.ID().getText())
@@ -668,6 +833,10 @@ class Visitor(MineScriptVisitor):
     def visitNegative(self, ctx):
         return -int(ctx.number().getText())
 
+    def visitNot(self, ctx):  # Expression of type !var
+        value = self.visit(ctx.expr())
+        return not value
+
     def visitFuncDef(self, ctx):  # Expression of type function func() { stat }
         name = ctx.ID(0).getText()
         value = ctx.stat()
@@ -717,6 +886,14 @@ class Visitor(MineScriptVisitor):
             return len(value)
         except TypeError:
             print((error+typeerror2+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
+            raise Exception("Abort")
+
+    def visitAbs(self, ctx):  # Expression of type abs(expression)
+        value = self.visit(ctx.expr())
+        try:
+            return abs(value)
+        except TypeError:
+            print((error+typeerror8+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), value.__class__.__name__))
             raise Exception("Abort")
 
     def visitInt(self, ctx):  # Expression of type int(expression)
@@ -868,10 +1045,6 @@ class Visitor(MineScriptVisitor):
     def visitParens(self, ctx):  # Expression of type (expression)
         return self.visit(ctx.expr())
 
-    def visitCommand(self, ctx):  # Expression of type /expression
-        exp = str(self.visit(ctx.expr()))
-        self.add_cmd(exp)
-
     def visitFor(self, ctx):  # Expression of type for (forInit; forTest; forUpdate) { stat }
         stats = ctx.stat()
         init = ctx.forControl().forInit()
@@ -895,8 +1068,3 @@ class Visitor(MineScriptVisitor):
             self.visit(ctx.stat(0))
         elif ctx.stat(1) is not None:
             self.visit(ctx.stat(1))
-
-    def visitSetDisplay(self, ctx):  # Expression of type $setdisplay(var, mode)
-        name = self.visit(ctx.igexpr())
-        mode = ctx.DSPL_MODE().getText()
-        self.add_cmd(f"scoreboard objectives setdisplay {mode} {name}")

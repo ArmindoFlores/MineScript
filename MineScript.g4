@@ -14,9 +14,10 @@ stat
     |   'if' '(' expr ')' stat ('else' stat)?                   # ifElse
     |   'function' ID '(' ID (',' ID)* ')' stat                 # funcDef  
     |   'function' ID '()' stat                                 # funcDef  
-    |   'return' expr                                           # return
+    |   'return' expr NEWLINE                                   # return
     |   '$function' ID '(' '$' ID (',' '$' ID)* ')' stat        # igFuncDef
     |   '$function' ID '()' stat                                # igFuncDef
+    |   '$return' igexpr NEWLINE                                # igReturn
     |   '$if' '(' igexpr ')' stat ('$else' stat)?               # igIfElse
     |   '$setdisplay' '(' igexpr ',' DSPL_MODE ')' NEWLINE      # setDisplay
     |   '$for' igForControl stat                                # igFor
@@ -24,11 +25,13 @@ stat
     |   '$forentity' '(' expr ';' ID ')' stat                   # igForEntity 
     |   '$execute' '(' expr ')' stat                            # execute
     |   '$mc' '(' expr ')' NEWLINE                              # command
+    |   '$setdata' '(' expr ',' expr ',' genexpr ')' NEWLINE    # setData
     |   NEWLINE                                                 # blank
     ;
 
 expr
     :   expr op=('*'|'/'|'-'|'+'|'%'|'^') expr      # op
+    |   expr op=('&&'|'||') expr                    # boolOp
     |   ID                                          # id
     |   literal                                     # constant
     |   '-' number                                  # negative
@@ -43,6 +46,7 @@ expr
     |   expr '.' ID '(' expr ')'                    # attributeCall
     |   expr '.' ID                                 # attribute
     |   'len' '(' expr ')'                          # len
+    |   'abs' '(' expr ')'                          # abs
     |   'str' '(' expr ')'                          # str
     |   'int' '(' expr ')'                          # int
     |   'float' '(' expr ')'                        # float
@@ -57,7 +61,10 @@ igexpr
     |   igexpr op=('>'|'<'|'>='|'<='|'=='|'!=') expr           # igComparison
     |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') expr               # igOp
     |   expr op=('>'|'<'|'>='|'<='|'=='|'!=') igexpr           # igComparisonM
-    |   expr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr               # igOpM
+    |   igexpr op=('&&'|'||') expr                             # igBoolOp
+    |   expr op=('&&'|'||') igexpr                             # igBoolOp
+    |   igexpr op=('&&'|'||') igexpr                           # igBoolOp
+    |   '!' igexpr                                             # igNot
     |   '(' igexpr ')'                                         # igParens
     |   '$pos(' expr ',' expr ')'                              # getPos
     |   '$isblock' '(' expr ',' expr ',' expr ')'              # isBlock
