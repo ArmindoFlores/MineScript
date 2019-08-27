@@ -1,9 +1,8 @@
+import os
 def get_id(name, tag):
     if tag in tags:
-        if name in eval(tag):
-            return eval(tag).index(name)
-
-tags = ["blocks", "items"]
+        if name in tags[tag]:
+            return tags[tag].index(name)
 
 blocks = ['minecraft:red_nether_brick_slab',
 	'minecraft:red_nether_brick_stairs',
@@ -1555,3 +1554,17 @@ items = ['minecraft:acacia_boat',
 	'minecraft:zombie_pigman_spawn_egg',
 	'minecraft:zombie_spawn_egg',
 	'minecraft:zombie_villager_spawn_egg']
+
+tags = {"blocks":blocks, "items":items}
+
+path = os.path.join(os.path.dirname(__file__), "tags.txt")
+
+try:
+    with open(path, "r") as file:
+        for line in file.readlines():
+            split = line.replace(" ", "").split("=")
+            split[1] = split[1].split(",")
+            if split[0] not in tags:
+                tags[split[0]] = split[1]
+except FileNotFoundError:
+    pass

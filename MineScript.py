@@ -162,17 +162,24 @@ try:
         filename = sys.argv[2]
     else:
         filename = sys.argv[1]
-
+        
+    name = "datapack"
+    description = "A datapack created with minescript"
+    
     path = '.'.join(filename.split(".")[:-1])+".info"
     if os.path.isfile(path):
         with open(path, "r") as file:
-            f = file.readlines()
-            name = f[0].strip()
-            description = f[1].strip().replace("\"", "\\\"")
+            config = {}
+            for line in file.readlines():
+                split = line.replace("\n", "").split("=")
+                config[split[0]] = split[1]
+            if "name" in config: name = config["name"]
+            else: print(f"{Fore.YELLOW}Couldn't find 'name' parameter! Using default...\n{Style.RESET_ALL}")
+            
+            if "description" in config: description = config["description"].replace("\"", "\\\"")
+            else: print(f"{Fore.YELLOW}Couldn't find 'description' parameter! Using default...\n{Style.RESET_ALL}")
     else:
-        print("Couldn't find the .info file! Using defaults...\n")
-        name = "datapack"
-        description = "A datapack created with minescript"
+        print(f"{Fore.YELLOW}Couldn't find the .info file! Using defaults...\n{Style.RESET_ALL}")
 
     path = parent(filename)
     path = os.path.join(path, "build")

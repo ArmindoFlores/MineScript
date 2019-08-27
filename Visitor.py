@@ -31,11 +31,15 @@ typeerror7 = "TypeError: float() argument must be a string or a number, not '%s'
 
 typeerror8 = "TypeError: int() argument must be a string or a number, not '%s'"
 
-typeerror8 = "TypeError: Invalid type"
+typeerror9 = "TypeError: Invalid type"
+
+typeerror10 = "TypeError: Function %s() requires %s arguments, but %s were given"
 
 nameerror = "NameError: Variable '%s' is not defined"
 
-syntaxerror = "SyntaxError: invalid syntax"
+syntaxerror1 = "SyntaxError: invalid syntax"
+
+syntaxerror2 = "SyntaxError: 'return' outside of function"
 
 indexerror = "IndexError: List index %i is out of range"
 
@@ -61,6 +65,13 @@ class Visitor(MineScriptVisitor):
     def __init__(self, name, code):
         self.code = code            # The actual code
         self.memory = {}            # Stores variables
+        self.localmemory = {}       # Stores local variables
+        self.func = None            # Current function
+        self.igfunc = None          # Current igfunction
+        self.r_value = None         # Stores the return variable of the current function
+        self.ig_r_value = None      # Stores the return variable of the current igfunc
+        self.functionargs = {}      # Stores the args a function takes
+        self.igfunctionargs = {}    # Stores the args an igfunction takes
         self.igfunctions = {}       # Stores the functions to be turned into .mcfunction files
         self.igmemory = {}          # Stores the in-game variable names and types 
         self.igcalls = []           # Keeps track of variable use to raise a warning when they're not defined
@@ -70,20 +81,21 @@ class Visitor(MineScriptVisitor):
         self.loops = 0              # Loop ID
         self.temp = 0               # Temp variable ID
         self.tag = 0                # Tag ID
-        self.temp_arr = 0           # Unused
         self._commands = []         # List of commands to be added to the current function
         self.datapack_name = name   # Name of the datapack
         self.get_tags()             # Get all tags from file
 
     def get_tags(self):
         for tag in tags.tags:
-            self.memory[tag] = getattr(tags, tag)
+            self.memory[tag] = tags.tags[tag]
 
-    def add_cmd(self, command):  # Add a command to the current function
+    def add_cmd(self, command, func=None):  # Add a command to the current function
         if self.prefixes != []:
             command = "execute " + ' '.join(self.prefixes) + " run " + command
         if self.loop != []:
             self.igloops[self.loop[-1]].append(command)
+        elif func:
+            self.igfunctions[func].append(command)
         else:
             self._commands.append(command)
 
@@ -95,6 +107,16 @@ class Visitor(MineScriptVisitor):
     def pop_loop(self):  # Pop latest loop
         self.loop.pop()
 
+    def get_var_name(self, name):
+        if self.igfunc:
+            if name in self.igfunctionargs[self.igfunc][1]:
+                index = self.igfunctionargs[self.igfunc][1].index(name)
+                return self.igfunctionargs[self.igfunc][0][index]
+            else:
+                return name
+        else:
+            return name
+
     def add_prefix(self, cmd):  # Add prefix (if/else/execute statement)
         self.prefixes.append(cmd)
 
@@ -104,9 +126,12 @@ class Visitor(MineScriptVisitor):
     def get_var(self):  # Add a new in-game internal variable and get its name on the scoreboard
         self.temp += 1
         name = f"_var{self.temp}"
-        self.igmemory[name] = int
+        self.add_igvar(name)
         return name
 
+    def add_igvar(self, name):  # Add a new ingame variable
+        self.igmemory[name] = int
+ 
     def set_var(self, name, value):  # Set an in-game variable
         self.add_cmd(f"scoreboard players set MineScript {name} {value}")
     
@@ -181,8 +206,8 @@ class Visitor(MineScriptVisitor):
             elif right[1] == "ig": r = right[0]
 
             if result is None: result = self.get_var()
-            self.add_cmd(f"scoreboard players operation MineScript {l} {operation}= MineScript {r}")
             self.add_cmd(f"scoreboard players operation MineScript {result} = MineScript {l}")
+            self.add_cmd(f"scoreboard players operation MineScript {result} {operation}= MineScript {r}")
 
         return result
          
@@ -190,39 +215,38 @@ class Visitor(MineScriptVisitor):
         name = ctx.ID().getText()
         value = self.visitChildren(ctx)
         if type(value) == int or type(value) == float:
-            self.igmemory[name] = type(value)
+            self.add_igvar(name)
             self.add_cmd(f"scoreboard players set MineScript {name} {round(value)}")
-        elif type(value) == list:
-            self.igmemory[name] = list
         else:
             print((error+typeerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
             raise Exception("Abort")
         return name
 
     def visitIgAssignIg(self, ctx):  # Expression of type $var = $expression
-        name1 = ctx.ID().getText()
-        name2 = self.visitChildren(ctx)
+        name1 = self.get_var_name(ctx.ID().getText())
+        name2 = self.get_var_name(self.visitChildren(ctx))
 
-        self.igcalls.append((name1, ctx.start.line))
-        self.igcalls.append((name2, ctx.start.line))
+        if not name1.startswith("_"): self.igcalls.append((name1, ctx.start.line))
+        if not name2.startswith("_"): self.igcalls.append((name2, ctx.start.line))
         
-        self.igmemory[name1] = int
+        self.add_igvar(name1)
         self.add_cmd(f"scoreboard players operation MineScript {name1} = MineScript {name2}")
         return name1
 
     def visitIgAssignUnit(self, ctx):  # Expression of type $var++
-        name = ctx.ID().getText()
-        self.igcalls.append((name, ctx.start.line))
+        name = self.get_var_name(ctx.ID().getText())
+        
+        if not name.startswith("_"): self.igcalls.append((name, ctx.start.line))
                          
         if ctx.op.type == MineScriptParser.USUM: self.add_cmd(f"scoreboard players add MineScript {name} 1")
         elif ctx.op.type == MineScriptParser.USUB: self.add_cmd(f"scoreboard players remove MineScript {name} 1")
         return name
 
     def visitIgAssignOp(self, ctx):  # Expression of type $var (*/+-%)= expression
-        name = ctx.ID().getText()
+        name = self.get_var_name(ctx.ID().getText())
         value = self.visitChildren(ctx)
 
-        self.igcalls.append((name, ctx.start.line))
+        if not name.startswith("_"): self.igcalls.append((name, ctx.start.line))
 
         if not(type(value) == int or type(value) == float):
             print((error+typeerror5+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), ctx.op.text, "int", value.__class__.__name__))
@@ -233,11 +257,11 @@ class Visitor(MineScriptVisitor):
         return name
 
     def visitIgAssignIgOp(self, ctx):  # Expression of type $var (*/+-%)= $expression
-        name1 = ctx.ID().getText()
-        name2 = self.visitChildren(ctx)
+        name1 = self.get_var_name(ctx.ID().getText())
+        name2 = self.get_var_name(self.visitChildren(ctx))
 
-        self.igcalls.append((name1, ctx.start.line))
-        self.igcalls.append((name2, ctx.start.line))           
+        if not name1.startswith("_"): self.igcalls.append((name1, ctx.start.line))
+        if not name2.startswith("_"): self.igcalls.append((name2, ctx.start.line))           
         
         self.igOperation(ctx.op.text[0], (name1, "ig"), (name2, "ig"), name1)
 
@@ -245,18 +269,18 @@ class Visitor(MineScriptVisitor):
         return self.visit(ctx.igexpr())
 
     def visitIgOpIg(self, ctx):  # Expression of type $var (*/+-%^) $expression
-        name1 = self.visit(ctx.igexpr(0))
-        name2 = self.visit(ctx.igexpr(1))
+        name1 = self.get_var_name(self.visit(ctx.igexpr(0)))
+        name2 = self.get_var_name(self.visit(ctx.igexpr(1)))
 
-        self.igcalls.append((name1, ctx.start.line))
-        self.igcalls.append((name2, ctx.start.line))
+        if not name1.startswith("_"): self.igcalls.append((name1, ctx.start.line))
+        if not name2.startswith("_"): self.igcalls.append((name2, ctx.start.line))
         
-        self.igOperation(ctx.op.text, (name1, "ig"), (name2, "ig"))
+        result = self.igOperation(ctx.op.text, (name1, "ig"), (name2, "ig"))
 
         return result
 
     def visitIgOp(self, ctx, reverse=False):  # Expression of type $var (*/+-%^) expression
-        name = self.visit(ctx.igexpr())
+        name = self.get_var_name(self.visit(ctx.igexpr()))
         value = self.visit(ctx.expr())
 
         if not(type(value) == int or type(value) == float):
@@ -272,7 +296,7 @@ class Visitor(MineScriptVisitor):
         return self.visitIgOp(ctx, True)
 
     def visitIgComparison(self, ctx, reverse=False):  # Expression of type $expression (> < <= >= != ==) expression
-        name = self.visit(ctx.igexpr())
+        name = self.get_var_name(self.visit(ctx.igexpr()))
         value = self.visit(ctx.expr())
 
         if not(type(value) == int or type(value) == float):
@@ -296,18 +320,18 @@ class Visitor(MineScriptVisitor):
         self.pop_prefix()
 
     def visitIgComparisonIg(self, ctx):  # Expression of type $expression (> < <= >= != ==) $expression
-        name1 = self.visit(ctx.igexpr(0))
-        name2 = self.visit(ctx.igexpr(1))
+        name1 = self.get_var_name(self.visit(ctx.igexpr(0)))
+        name2 = self.get_var_name(self.visit(ctx.igexpr(1)))
 
-        self.igcalls.append((name1, ctx.start.line))
-        self.igcalls.append((name2, ctx.start.line))
+        if not name1.startswith("_"): self.igcalls.append((name1, ctx.start.line))
+        if not name2.startswith("_"): self.igcalls.append((name2, ctx.start.line))
         
         result = self.igComparison(ctx.op.text, (name1, "ig"), (name2, "ig"))
         
         return result
 
     def visitIgIfElse(self, ctx):  # Expression of type $if ($expression) { stat } ($else { stat })?
-        name = self.visit(ctx.igexpr())
+        name = self.get_var_name(self.visit(ctx.igexpr()))
         nested = False
         length = 0
         
@@ -403,7 +427,7 @@ class Visitor(MineScriptVisitor):
             self.add_cmd(f"scoreboard players operation {selector} {name} = MineScript {v}")
             
         elif ge.igexpr() is not None:
-            name2 = self.visit(ge.igexpr())
+            name2 = self.get_var_name(self.visit(ge.igexpr()))
             self.add_cmd(f"scoreboard players operation {selector} {name} = MineScript {name2}")
 
     def visitAddTag(self, ctx):  # Expression of type $addtag(selector, tag)
@@ -467,7 +491,7 @@ class Visitor(MineScriptVisitor):
             expr_n = self.visit(expr.expr())
             
         elif expr.igexpr() is not None:
-            name = self.visit(expr.igexpr())
+            name = self.get_var_name(self.visit(expr.igexpr()))
             self.igcalls.append((name, ctx.start.line))
             
             expr_n = self.visit(expr.igexpr())
@@ -489,7 +513,7 @@ class Visitor(MineScriptVisitor):
         expr = ctx.igForControl().igexpr()
         update = ctx.igForControl().igForUpdate()
         init_n = self.visit(init)
-        expr_n = self.visit(expr)
+        expr_n = self.get_var_name(self.visit(expr))
 
         loop = "_for" + str(self.loops+1)
         self.add_cmd(f"execute if score MineScript {expr_n} matches 1.. run function {self.datapack_name}:{loop}")
@@ -542,76 +566,142 @@ class Visitor(MineScriptVisitor):
                 value = str(self.visit(e.expr()))
                 text.append("{\"text\":\"%s\",\"color\":\"%s\"}"%(value, color))
             elif e.igexpr() is not None:
-                name = str(self.visit(e.igexpr()))
+                name = str(self.get_var_name(self.visit(e.igexpr())))
                 text.append("{\"score\":{\"name\":\"MineScript\",\"objective\":\"%s\"},\"color\":\"%s\"}"%(name, color))
         self.add_cmd("tellraw @a ["+','.join(text)+"]")
 
     def visitTeleport(self, ctx):  # Expression of type $tp(selector, pos)
         selector = str(self.visit(ctx.expr(0)))
         pos = str(self.visit(ctx.expr(1)))
-        self.add_cmd("execute as %s at @s run tp @s %s"%(selector, pos))
+        self.add_cmd(f"execute as {selector} at @s run tp @s {pos}")
 
     def visitIgFuncDef(self, ctx):  # Expression of type $function func { stat }
-        name = ctx.ID().getText()
+        name = ctx.ID(0).getText()
         stats = ctx.stat()
+        args = ctx.ID()[1:]
+        self.igfunctionargs[name] = [[], []]
+        for arg in args:
+            var = self.get_var()
+            self.igfunctionargs[name][0].append(var)
+            self.igfunctionargs[name][1].append(arg.getText())
+        self.igfunc = name
         self.visit(stats)
+        self.igfunc = None
         self.igfunctions[name] = self._commands[:]
         self._commands = []
 
     def visitIgFuncCall(self, ctx):  # Expression of type $func()
         name = ctx.ID().getText()
-        self.add_cmd("function %s:%s"%(self.datapack_name, name))
+        variables = ctx.genexpr()
+
+        if not name in self.igfunctions:
+                print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+                raise Exception("Abort")
+        
+        for var in range(len(variables)):
+            if variables[var].expr():
+                self.set_var(self.igfunctionargs[name][0][var], int(self.visit(variables[var])))
+            else:
+                n = variables[var].getText()[1:]
+                self.igcalls.append((n, ctx.start.line))
+                self.add_cmd(f"scoreboard players operation set MineScript {self.igfunctionargs[name][0][var]} = MineScript {n}")
+        self.add_cmd(f"function {self.datapack_name}:{name}")
 
     def visitIgId(self, ctx):  # Expression of type $var
-        name = ctx.ID().getText()
+        name = self.get_var_name(ctx.ID().getText())
         return name
 
     def visitAssign(self, ctx):  # Expression of type var = expression
         name = ctx.ID().getText()
         value = self.visit(ctx.expr())
-        self.memory[name] = value
+        if self.func: self.localmemory[name] = value
+        else: self.memory[name] = value
         return value
 
     def visitAssignUnit(self, ctx):  # Expression of type var++
         name = ctx.ID().getText()
         try:
-            if ctx.op.type == MineScriptParser.USUM: self.memory[name] += 1
-            elif ctx.op.type == MineScriptParser.USUB: self.memory[name] -= 1
+            if ctx.op.type == MineScriptParser.USUM: self.localmemory[name] += 1
+            elif ctx.op.type == MineScriptParser.USUB: self.localmemory[name] -= 1
         except TypeError:
-            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.memory[name].__class__.__name__))
+            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.localmemory[name].__class__.__name__))
             raise Exception("Abort")
         except KeyError:
-            print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
-            raise Exception("Abort")
+            try:
+                if ctx.op.type == MineScriptParser.USUM: self.memory[name] += 1
+                elif ctx.op.type == MineScriptParser.USUB: self.memory[name] -= 1
+            except TypeError:
+                print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.memory[name].__class__.__name__))
+                raise Exception("Abort")
+            except KeyError:
+                print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+                raise Exception("Abort")
 
     def visitAssignOp(self, ctx):  # Expression of type var (*/+-%^)= expression
         name = ctx.ID().getText()
         value = self.visit(ctx.expr())
         try:
-            if ctx.op.type == MineScriptParser.PE: self.memory[name] += value
-            elif ctx.op.type == MineScriptParser.SE: self.memory[name] -= value
-            elif ctx.op.type == MineScriptParser.MLE: self.memory[name] *= value
-            elif ctx.op.type == MineScriptParser.DE: self.memory[name] /= value
-            elif ctx.op.type == MineScriptParser.MDE: self.memory[name] %= value
-            elif ctx.op.type == MineScriptParser.PWE: self.memory[name] = self.memory[name] ** value
+            if ctx.op.type == MineScriptParser.PE: self.localmemory[name] += value
+            elif ctx.op.type == MineScriptParser.SE: self.localmemory[name] -= value
+            elif ctx.op.type == MineScriptParser.MLE: self.localmemory[name] *= value
+            elif ctx.op.type == MineScriptParser.DE: self.localmemory[name] /= value
+            elif ctx.op.type == MineScriptParser.MDE: self.localmemory[name] %= value
+            elif ctx.op.type == MineScriptParser.PWE: self.localmemory[name] = self.localmemory[name] ** value
         except TypeError:
-            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.memory[name].__class__.__name__))
+            print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.localmemory[name].__class__.__name__))
             raise Exception("Abort")
         except KeyError:
+            try:
+                if ctx.op.type == MineScriptParser.PE: self.memory[name] += value
+                elif ctx.op.type == MineScriptParser.SE: self.memory[name] -= value
+                elif ctx.op.type == MineScriptParser.MLE: self.memory[name] *= value
+                elif ctx.op.type == MineScriptParser.DE: self.memory[name] /= value
+                elif ctx.op.type == MineScriptParser.MDE: self.memory[name] %= value
+                elif ctx.op.type == MineScriptParser.PWE: self.memory[name] = self.memory[name] ** value
+            except TypeError:
+                print((error+typeerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, self.memory[name].__class__.__name__))
+                raise Exception("Abort")
+            except KeyError:
+                print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+                raise Exception("Abort")
+
+    def visitNegative(self, ctx):
+        return -int(ctx.number().getText())
+
+    def visitFuncDef(self, ctx):  # Expression of type function func() { stat }
+        name = ctx.ID(0).getText()
+        value = ctx.stat()
+        self.functionargs[name] = []
+        for arg in ctx.ID()[1:]:
+            self.functionargs[name].append(arg.getText())
+        if self.func: self.localmemory[name] = value
+        else: self.memory[name] = value
+
+    def visitFuncCall(self, ctx):  # Expression of type func()
+        self.r_value = None
+        name = ctx.ID().getText()
+        args = ctx.expr()
+        if len(args) != len(self.functionargs[name]):
+            print((error+typeerror10+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name, len(self.functionargs[name]), len(args)))
+            raise Exception("Abort")
+        for arg in range(len(args)):
+            self.localmemory[self.functionargs[name][arg]] = self.visit(args[arg])
+        if name in self.memory:
+            self.func = name
+            r = self.visit(self.memory[name])
+            self.localmemory = {}
+            self.func = None
+            return self.r_value
+        else:
             print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
             raise Exception("Abort")
 
-    def visitFuncDef(self, ctx):  # Expression of type function func { stat }
-        name = ctx.ID().getText()
-        value = ctx.stat()
-        self.memory[name] = value
-
-    def visitFuncCall(self, ctx):  # Expression of type func()
-        name = ctx.ID().getText()
-        if name in self.memory:
-            return self.visit(self.memory[name])
+    def visitReturn(self, ctx):
+        if self.func:
+            self.r_value = self.visit(ctx.expr())
+            return self.r_value
         else:
-            print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))
+            print((error+syntaxerror2+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
             raise Exception("Abort")
 
     def visitPrint(self, ctx):  # Expression of type print(expression,...)
@@ -670,7 +760,7 @@ class Visitor(MineScriptVisitor):
                 value = float(value)
                 return value
             except ValueError:
-                print((error+syntaxerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
+                print((error+syntaxerror1+end)%(ctx.start.line, self.code[ctx.start.line-1].strip()))
                 raise Exception("Abort")
 
     def visitConstantArray(self, ctx):  # Expression of type array (=list) [expression,...]
@@ -732,7 +822,9 @@ class Visitor(MineScriptVisitor):
 
     def visitId(self, ctx):  # Expression of type var
         name = ctx.ID().getText()
-        if name in self.memory:
+        if name in self.localmemory:
+            return self.localmemory[name]
+        elif name in self.memory:
             return self.memory[name]
         else:
             print((error+nameerror+end)%(ctx.start.line, self.code[ctx.start.line-1].strip(), name))

@@ -12,8 +12,11 @@ stat
     |   'for' forControl stat                                   # for
     |   'while' '(' expr ')' stat                               # while
     |   'if' '(' expr ')' stat ('else' stat)?                   # ifElse
-    |   'function' ID stat                                      # funcDef      
-    |   '$function' ID stat                                     # igFuncDef
+    |   'function' ID '(' ID (',' ID)* ')' stat                 # funcDef  
+    |   'function' ID '()' stat                                 # funcDef  
+    |   'return' expr                                           # return
+    |   '$function' ID '(' '$' ID (',' '$' ID)* ')' stat        # igFuncDef
+    |   '$function' ID '()' stat                                # igFuncDef
     |   '$if' '(' igexpr ')' stat ('$else' stat)?               # igIfElse
     |   '$setdisplay' '(' igexpr ',' DSPL_MODE ')' NEWLINE      # setDisplay
     |   '$for' igForControl stat                                # igFor
@@ -25,13 +28,15 @@ stat
     ;
 
 expr
-    :   expr op=('*'|'/'|'-'|'+'|'%'|'^') expr     # op
+    :   expr op=('*'|'/'|'-'|'+'|'%'|'^') expr      # op
     |   ID                                          # id
     |   literal                                     # constant
+    |   '-' number                                  # negative
     |   array                                       # constantArray
     |   '(' expr ')'                                # parens
     |   expr op=('>'|'<'|'>='|'<='|'=='|'!=') expr  # comparison
     |   '!' expr                                    # not
+    |   ID '(' expr (',' expr)* ')'                 # funcCall
     |   ID '()'                                     # funcCall
     |   expr '[' expr ']'                           # arrayIndex
     |   expr '.' ID '()'                            # attributeCallEmpty
@@ -45,6 +50,7 @@ expr
 
 igexpr
     :   '$' ID                                                 # igId
+    |   '$' ID '(' genexpr (',' genexpr)* ')'                  # igFuncCall
     |   '$' ID '()'                                            # igFuncCall
     |   igexpr op=('>'|'<'|'>='|'<='|'=='|'!=') igexpr         # igComparisonIg
     |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr             # igOpIg
@@ -127,6 +133,11 @@ literal
     | Float
     ;
 
+number
+    : Integer
+    | Float
+    ;
+
 array
     : '[' expr? (',' expr)* ']'
     ;
@@ -141,11 +152,11 @@ StringLiteral
     ;
 
 Float
-    : '-'? [0-9]+ '.' [0-9]+
+    : [0-9]+ '.' [0-9]+
     ;
 
 Integer
-    : '-'? [0-9]+
+    : [0-9]+
     ;
 
 Boolean
