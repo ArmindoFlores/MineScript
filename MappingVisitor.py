@@ -226,7 +226,8 @@ class MVisitor(Visitor):
         for child in ctx.igPrintControl().igPrintArg():
             e = child.genexpr()
             if e.expr() is not None: self.visit(e.expr())
-            else:
+            if e.igexpr() is not None:
+                self.visit(e.igexpr())
                 name = self.get_var_name(self.visit(e.igexpr()))
                 if name.startswith("_"): self.mark_unused(name)
 
