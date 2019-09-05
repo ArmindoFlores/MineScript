@@ -61,6 +61,7 @@ igexpr
     |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr             # igOpIg
     |   igexpr op=('>'|'<'|'>='|'<='|'=='|'!=') expr           # igComparison
     |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') expr               # igOp
+	|   expr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr               # igOpM
     |   expr op=('>'|'<'|'>='|'<='|'=='|'!=') igexpr           # igComparisonM
     |   igexpr op=('&&'|'||') expr                             # igBoolOp
     |   expr op=('&&'|'||') igexpr                             # igBoolOp
