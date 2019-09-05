@@ -2,8 +2,8 @@ import os
 import traceback
 import shutil
 import argparse
+from antlr4 import CommonTokenStream, FileStream
 from colorama import init, Style, Fore
-from antlr4 import *
 from MineScriptLexer import MineScriptLexer
 from MineScriptParser import MineScriptParser
 from MappingVisitor import MVisitor
@@ -118,10 +118,9 @@ def visit(file, datapack_name, imported=[]):
         m_visitor.igfunctionargs = mem[1]
         m_visitor.igfunctionreturn = mem[2]
         m_visitor.igfunctions = mem[3]
-        m_visitor.vars = mem[4]
-        m_visitor.igloops = mem[5]
-        m_visitor.loops = mem[6]
-        m_visitor.tag = mem[7]
+        m_visitor.igloops = mem[4]
+        m_visitor.loops = mem[5]
+        m_visitor.tag = mem[6]
     m_visitor.visit(tree)
     
     visitor = Visitor(name, code, file)
@@ -129,18 +128,17 @@ def visit(file, datapack_name, imported=[]):
     visitor.igfunctionargs = m_visitor.igfunctionargs
     visitor.igfunctionreturn = m_visitor.igfunctionreturn
     visitor.igfunctions = m_visitor.igfunctions
-    visitor.vars = m_visitor.vars
     visitor.igloops = m_visitor.igloops
     visitor.loops = m_visitor.loops
     visitor.tag = m_visitor.tag
     if mem is not None:
-        visitor.warnings = mem[8]
+        visitor.warnings = mem[7]
     visitor.visit(tree)
 
-    return (visitor.igmemory, visitor.igfunctionargs, visitor.igfunctionreturn, visitor.igfunctions, visitor.vars, visitor.igloops, visitor.loops, visitor.tag, visitor.warnings)
+    return (visitor.igmemory, visitor.igfunctionargs, visitor.igfunctionreturn, visitor.igfunctions, visitor.igloops, visitor.loops, visitor.tag, visitor.warnings)
     
 def main(file, name):
-    igmemory, _, _, igfunctions, _, igloops, _, _, warnings = visit(file, name)
+    igmemory, _, _, igfunctions, igloops, _, _, warnings = visit(file, name)
 
     if verbose >= 1:
         for warning in warnings:
@@ -149,7 +147,6 @@ def main(file, name):
     
     return (igmemory, igfunctions, igloops)
     
-
 def assemble_pack(name, memory, path):
     global commands
     # Setup scoreboard  variables

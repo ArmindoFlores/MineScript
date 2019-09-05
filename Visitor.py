@@ -1,4 +1,5 @@
 from re import findall
+from math import sin, cos, tan
 from colorama import init, Style, Fore
 from MineScriptVisitor import MineScriptVisitor
 from MineScriptParser import MineScriptParser
@@ -34,8 +35,11 @@ valueerror2 = "ValueError: Could not convert to int: '%s'"
 valueerror3 = "ValueError: Selector not formatted correctly"
 
 def add_to_selector(selector, args):
+    if len(selector) < 3:
+        selector = selector + "[]"
     tp = selector[:2]
-    attributes = findall("\[([^]]+)\]", selector)[0].split(",")
+    attributes = findall("\[([^]]+)\]", selector)
+    if len(attributes): attributes = attributes[0].split(",")
     attributes = [attr.strip() for attr in attributes]
     for arg in args:
         if arg not in attributes:
@@ -86,6 +90,10 @@ class Visitor(MineScriptVisitor):
         if var not in self.nreusable:
             self.nreusable.append(var)
 
+    def mark_reusable(self, var):  # Mark an in-game variable as reusable
+        if var in self.nreusable:
+            self.nreusable.remove(var)
+
     def get_var(self):  # Generate and return a new temporary variable
         n = self.get_next_var_id()
         name = f"_var{n}"
@@ -103,10 +111,8 @@ class Visitor(MineScriptVisitor):
         return 0
 
     def add_func_arg(self, func, var, arg):
-        if var not in self.igfunctionargs[func][0]:
-            self.igfunctionargs[func][0].append(var)
-        if var not in self.igfunctionargs[func][1]:
-            self.igfunctionargs[func][1].append(arg)
+        self.igfunctionargs[func][0].append(var)
+        self.igfunctionargs[func][1].append(arg)
 
     def add_warning(self, warning):  # Add a warning
         if warning not in self.warnings:
@@ -462,18 +468,30 @@ class Visitor(MineScriptVisitor):
 
     def visitGetPos(self, ctx):  # Expression of type $pos(selector, index)
         selector = str(self.visit(ctx.expr(0)))
+        if selector not in ["@s", "@r", "@p"]:
+            selector = add_to_selector(selector, ["limit=1"])
         coord = self.visit(ctx.expr(1))
 
         if not type(coord) == int:
             print((error+typeerror3+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), coord.__class__.__name__))
             raise Exception("Abort")
+
+        if ctx.expr(2) is not None:
+            scale = self.visit(ctx.expr(2))
+        else:
+            scale = None
+
+        if scale is not None and not type(scale) == int and not type(scale) == float:
+            print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), scale.__class__.__name__))
+            raise Exception("Abort")
         
         result = self.get_var()
         self.set_var(result, 0)
-
-        if coord == 0: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[0]")
-        elif coord == 1: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[1]")
-        elif coord == 2: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[2]")
+        if scale is not None: scale = f" {scale}"
+        else: scale = ""
+        if coord == 0: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[0]" + scale)
+        elif coord == 1: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[1]" + scale)
+        elif coord == 2: self.add_cmd(f"execute store result score MineScript {result} run data get entity {selector} Pos[2]" + scale)
 
         return result
 
@@ -501,7 +519,8 @@ class Visitor(MineScriptVisitor):
 
     def visitSetData(self, ctx):
         selector = str(self.visit(ctx.expr(0)))
-        selector = add_to_selector(selector, ["limit=1"])
+        if selector not in ["@s", "@r", "@p"]:
+            selector = add_to_selector(selector, ["limit=1"])
         path = str(self.visit(ctx.expr(1)))
 
         if ctx.genexpr().expr() is not None:
@@ -526,8 +545,18 @@ class Visitor(MineScriptVisitor):
     def visitAddObj(self, ctx):
         name = str(self.visit(ctx.expr(0)))
         tp = str(self.visit(ctx.expr(1)))
-
         self.add_cmd(f"scoreboard objectives add {name} {tp}")
+
+    def visitRename(self, ctx):
+        selector = str(self.visit(ctx.expr(0)))
+        name = str(self.visit(ctx.expr(1))).replace("\"", "\\\"")
+        print(f"data modify entity {selector} CustomName set value \"{name}\"")
+        self.add_cmd(f"data modify entity {selector} CustomName set value \"{name}\"")
+
+    def visitEnableTrigger(self, ctx):
+        selector = str(self.visit(ctx.expr(0)))
+        name = str(self.visit(ctx.expr(1)))
+        self.add_cmd(f"scoreboard players enable {selector} {name}")
 
     def visitGetScore(self, ctx):  # Expression of type $getscore(selector, name)
         selector = str(self.visit(ctx.expr(0)))
@@ -921,6 +950,27 @@ class Visitor(MineScriptVisitor):
     def visitStr(self, ctx):  # Expression of type str(expression)
         value = self.visit(ctx.expr())
         return str(value)
+
+    def visitSin(self, ctx):
+        value = self.visit(ctx.expr())
+        if not(type(value) == int or type(value) == float):
+            print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
+            raise Exception("Abort")
+        return sin(value)
+        
+    def visitCos(self, ctx):
+        value = self.visit(ctx.expr())
+        if not(type(value) == int or type(value) == float):
+            print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
+            raise Exception("Abort")
+        return cos(value)
+        
+    def visitTan(self, ctx):
+        value = self.visit(ctx.expr())
+        if not(type(value) == int or type(value) == float):
+            print((error+typeerror1+end)%(self.file, ctx.start.line, self.code[ctx.start.line-1].strip(), name, value.__class__.__name__))
+            raise Exception("Abort")
+        return tan(value)
 
     def visitConstant(self, ctx):  # Expression of type int, float, string or boolean
         value = ctx.literal().getText()

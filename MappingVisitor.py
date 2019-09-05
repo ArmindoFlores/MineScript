@@ -52,11 +52,10 @@ class MVisitor(Visitor):
 
     def visitIgAssignOp(self, ctx):  # Expression of type $var (*/+-%)= expression
         name = ctx.ID().getText()
-        value = self.visitChildren(ctx)
+        self.visitChildren(ctx)
         return name
 
     def visitIgAssignIgOp(self, ctx):  # Expression of type $var (*/+-%)= $expression
-        name1 = ctx.ID().getText()
         name2 = self.visitChildren(ctx)
         if name2.startswith("_"): self.mark_unused(name2)
 
@@ -102,7 +101,7 @@ class MVisitor(Visitor):
 
     def visitIgComparison(self, ctx):  # Expression of type $expression (> < <= >= != ==) expression
         name = self.visit(ctx.igexpr())
-        value = self.visit(ctx.expr())
+        self.visit(ctx.expr())
         if name.startswith("_"): self.mark_unused(name)
         result = self.get_var()
         return result
@@ -111,7 +110,7 @@ class MVisitor(Visitor):
         return self.visitIgComparison(ctx)
 
     def visitExecute(self, ctx):  # Expression of type $execute(execute){ stat }
-        execute = str(self.visit(ctx.expr()))
+        self.visit(ctx.expr())
         stat = ctx.stat()
         self.visit(stat)
 
@@ -155,6 +154,12 @@ class MVisitor(Visitor):
     def visitAddObj(self, ctx):
         self.visitChildren(ctx)
 
+    def visitEnableTrigger(self, ctx):
+        self.visitChildren(ctx)
+
+    def visitRename(self, ctx):
+        self.visitChildren(ctx)
+
     def visitGetScore(self, ctx):  # Expression of type $getscore(selector, name)
         self.visitChildren(ctx)
         result = self.get_var()
@@ -166,9 +171,9 @@ class MVisitor(Visitor):
         ge = ctx.genexpr()
 
         if ge.expr() is not None:                 
-            v = self.get_var()    
+            self.get_var()    
         elif ge.igexpr() is not None:
-            name2 = visitAddObjself.visit(ge.igexpr())
+            name2 = self.get_var_name(self.visit(ge.igexpr()))
             if name2.startswith("_"): self.mark_unused(name2)
 
     def visitAddTag(self, ctx):  # Expression of type $addtag(selector, tag)
@@ -203,7 +208,7 @@ class MVisitor(Visitor):
         init = ctx.igForControl().igForInit()
         expr = ctx.igForControl().igexpr()
         update = ctx.igForControl().igForUpdate()
-        init_n = self.visit(init)
+        self.visit(init)
         expr_n = self.visit(expr)
         self.visit(stats)
         self.visit(update)
@@ -234,7 +239,9 @@ class MVisitor(Visitor):
         args = ctx.ID()[1:]
         self.igfunctionargs[name] = [[], []]
         r_var = self.get_var()
+        self.mark_not_reusable(r_var)
         self.igfunctionreturn[name] = r_var
+        
         for arg in args:
             var = self.get_var()
             self.mark_not_reusable(var)
@@ -244,7 +251,7 @@ class MVisitor(Visitor):
         self.visit(stats)
 
     def visitIgFuncCall(self, ctx):  # Expression of type $func()
-        return self.get_var()
+        return ""
 
     def visitIgReturn(self, ctx):
         self.visitChildren(ctx)
