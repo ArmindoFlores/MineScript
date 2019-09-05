@@ -141,6 +141,27 @@ arr = [2,3,4]
 print(sum(arr))  # Output 9 (2 + 3 + 4)
 ```
 
+### Include
+
+The `include` keyword is a special keyword that lets you include all the code from another `.ms` file into your current project.
+It should always come before anything else on your code. An example would be:
+
+File `myotherproject.ms`
+```
+$function afunction() {
+	$print("Loaded from another file")
+}
+```
+
+File `myproject.ms`
+```
+include myotherproject
+
+$function load() {
+	$afunction()
+}
+```
+
 ## In-game operations
 
 Let's now take a look at how this code would work if run inside the game.
@@ -255,4 +276,4 @@ You can still run any Minecraft command normally by using `$mc("your command her
 
 After you've finished writing all your code, you can build your datapack using the command `minescript --file yourpack.ms`.
 MineScript will create your datapack `.zip` folder inside `/dist/datapack.zip`. If you want to change the name of the datapack
-or some of its attributes, use `minescript --help` to get a list of all possible flags you can use.
+or some if its attributes, use `minescript --help` to get a list of all possible flags you can use.
