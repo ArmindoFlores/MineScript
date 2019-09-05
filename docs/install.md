@@ -1,6 +1,6 @@
 # Installation
 
-To start using MineScript, you must first download either the [source code](https://github.com/ArmindoFlores/MineScript) or the [executable file](https://github.com/ArmindoFlores/MineScript/releases/download/v1.1.1-beta/minescript-x86.exe). MineScript is written in [Python 3](https://www.python.org/downloads/), so if you download the source code, you'll need it too.
+To start using MineScript, you must first download either the [source code](https://github.com/ArmindoFlores/MineScript) or the [executable file](https://github.com/ArmindoFlores/MineScript/releases/download/v1.1.2-beta/minescript-x86.exe). MineScript is written in [Python 3](https://www.python.org/downloads/), so if you download the source code, you'll need it too.
 
 
 __How to build MineScript__
