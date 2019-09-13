@@ -33,6 +33,7 @@ class MVisitor(Visitor):
         self.tag = 0                # Tag ID
         
         self.get_tags()             # Get all tags from file
+        self.memory["dpname"] = name
          
     def visitIgAssign(self, ctx):  # Expression of type $var = expression
         name = ctx.ID().getText()

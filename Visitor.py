@@ -76,6 +76,7 @@ class Visitor(MineScriptVisitor):
         self.tag = 0                # Tag ID     
         
         self.get_tags()             # Get all tags from file
+        self.memory["dpname"] = name
 
     def add_var(self, name):  # Add a new in-game variable
         if name not in self.igmemory:
