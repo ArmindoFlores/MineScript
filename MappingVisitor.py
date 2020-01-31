@@ -17,7 +17,7 @@ class MVisitor(Visitor):
         self.func = None            # Current function
         self.r_value = None         # Stores the return variable of the current function
 
-        self.igmemory = []          # Stores the in-game variable names
+        self.igmemory = {}          # Stores the in-game variable names
         self.igfunctionargs = {}    # Stores the args an igfunction takes
         self.igfunctionreturn = {}  # Stores the name of the return variable of a function
         self.igfunctions = {}       # Stores the functions to be turned into .mcfunction files
@@ -38,13 +38,32 @@ class MVisitor(Visitor):
     def visitIgAssign(self, ctx):  # Expression of type $var = expression
         name = ctx.ID().getText()
         self.visitChildren(ctx)
-        self.add_var(name)
+
+    def visitIgFirstAssign(self, ctx):
+        name = ctx.ID().getText()
+        tp = ctx.tp.text
+        self.visitChildren(ctx)
+        if tp == "int":
+            self.add_int_var(name)
+        elif tp == "float":
+            self.add_float_var(name)
 
     def visitIgAssignIg(self, ctx):  # Expression of type $var = $expression
         name1 = self.get_var_name(ctx.ID().getText())
         name2 = self.get_var_name(self.visitChildren(ctx))
         if name2.startswith("_"): self.mark_unused(name2)
         self.add_var(name1)
+        return name1
+
+    def visitIgFirstAssignIg(self, ctx):  # Expression of type $var = $expression
+        name1 = self.get_var_name(ctx.ID().getText())
+        name2 = self.get_var_name(self.visitChildren(ctx))
+        tp = ctx.tp.text
+        if name2.startswith("_"): self.mark_unused(name2)
+        if tp == "int":
+            self.add_int_var(name1)
+        elif tp == "float":
+            self.add_float_var(name1)
         return name1
 
     def visitIgAssignUnit(self, ctx):  # Expression of type $var++
@@ -68,14 +87,14 @@ class MVisitor(Visitor):
         name2 = self.visit(ctx.igexpr(1))
         if name1.startswith("_"): self.mark_unused(name1)
         if name2.startswith("_"): self.mark_unused(name2)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitIgOp(self, ctx):  # Expression of type $expression (*/+-%^) expression
         name = self.visit(ctx.igexpr())
         self.visit(ctx.expr())
         if name.startswith("_"): self.mark_unused(name)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitIgOpM(self, ctx):  # Expression of type expression (*/+-%^) $expression
@@ -84,7 +103,7 @@ class MVisitor(Visitor):
     def visitIgNot(self, ctx):  # Expression of type !$expression
         name = self.get_var_name(self.visit(ctx.igexpr()))
         if name.startswith("_"): self.mark_unused(name)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitIgBoolOp(self, ctx):  # Expression of type genexpr &&/|| genexpr
@@ -97,14 +116,14 @@ class MVisitor(Visitor):
             expr2 = self.visit(ctx.igexpr(1))
             if expr1.startswith("_"): self.mark_unused(expr1)
             if expr2.startswith("_"): self.mark_unused(expr2)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitIgComparison(self, ctx):  # Expression of type $expression (> < <= >= != ==) expression
         name = self.visit(ctx.igexpr())
         self.visit(ctx.expr())
         if name.startswith("_"): self.mark_unused(name)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitIgComparisonM(self, ctx):  # Expression of type expression (> < <= >= != ==) $expression
@@ -120,7 +139,7 @@ class MVisitor(Visitor):
         name2 = self.get_var_name(self.visit(ctx.igexpr(1)))
         if name1.startswith("_"): self.mark_unused(name1)
         if name2.startswith("_"): self.mark_unused(name2)
-        result = self.get_var()      
+        result = self.get_int_var()      
         return result
 
     def visitIgIfElse(self, ctx):  # Expression of type $if ($expression) { stat } ($else { stat })?
@@ -132,12 +151,12 @@ class MVisitor(Visitor):
 
     def visitGetPos(self, ctx):  # Expression of type $pos(selector, index)
         self.visitChildren(ctx)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitGetData(self, ctx):  # Expression of type $getdata(selector, path, scale?)
         self.visitChildren(ctx)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitSetData(self, ctx):  # Expression of type $setdata(selector, path, value)
@@ -149,7 +168,7 @@ class MVisitor(Visitor):
 
     def visitIsBlock(self, ctx):  # Expression of type $isblock(selector, pos, block)
         self.visitChildren(ctx)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitAddObj(self, ctx):
@@ -163,7 +182,7 @@ class MVisitor(Visitor):
 
     def visitGetScore(self, ctx):  # Expression of type $getscore(selector, name)
         self.visitChildren(ctx)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitSetScore(self, ctx):  # Expression of type $setscore(selector, name, value)
@@ -172,7 +191,7 @@ class MVisitor(Visitor):
         ge = ctx.genexpr()
 
         if ge.expr() is not None:                 
-            self.get_var()    
+            self.get_int_var()    
         elif ge.igexpr() is not None:
             name2 = self.get_var_name(self.visit(ge.igexpr()))
             if name2.startswith("_"): self.mark_unused(name2)
@@ -185,12 +204,12 @@ class MVisitor(Visitor):
 
     def visitHasTag(self, ctx):  # Expression of type $hastag(selector, tag)
         self.visitChildren(ctx)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitCount(self, ctx):  # Expression of type $count(selector)
         self.visitChildren(ctx)
-        result = self.get_var()
+        result = self.get_int_var()
         return result
 
     def visitIgWhile(self, ctx): # Expression of type $while (genexpr) { stat }
@@ -240,12 +259,12 @@ class MVisitor(Visitor):
         stats = ctx.stat()
         args = ctx.ID()[1:]
         self.igfunctionargs[name] = [[], []]
-        r_var = self.get_var()
+        r_var = self.get_int_var()
         self.mark_not_reusable(r_var)
         self.igfunctionreturn[name] = r_var
         
         for arg in args:
-            var = self.get_var()
+            var = self.get_int_var()
             self.mark_not_reusable(var)
             self.add_func_arg(name, var, arg.getText())
             

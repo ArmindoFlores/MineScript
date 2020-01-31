@@ -8,78 +8,78 @@ stat
     |   '{' stat* '}'                                           # blockstat
     |   variableDeclaration NEWLINE                             # assignStat
     |   igVariableDeclaration NEWLINE                           # igAssignStat
-    |   'print' '(' expr (',' expr)* ')' NEWLINE                # print
-    |   'for' forControl stat                                   # for
-    |   'while' '(' expr ')' stat                               # while
-    |   'if' '(' expr ')' stat ('else' stat)?                   # ifElse
-    |   'function' ID '(' ID (',' ID)* ')' stat                 # funcDef  
-    |   'function' ID '()' stat                                 # funcDef  
-    |   'return' '(' expr ')' NEWLINE                           # return
-    |   'include' ID NEWLINE                                    # include
-    |   '$function' ID '(' '$' ID (',' '$' ID)* ')' stat        # igFuncDef
-    |   '$function' ID '()' stat                                # igFuncDef
-    |   '$return' '(' igexpr ')' NEWLINE                        # igReturn
-    |   '$if' '(' igexpr ')' stat ('$else' stat)?               # igIfElse
-    |   '$setdisplay' '(' igexpr ',' DSPL_MODE ')' NEWLINE      # setDisplay
-    |   '$for' igForControl stat                                # igFor
-    |   '$while' '(' genexpr ')' stat                           # igWhile
-    |   '$forentity' '(' expr ';' ID ')' stat                   # igForEntity 
-    |   '$execute' '(' expr ')' stat                            # execute
-    |   '$mc' '(' expr ')' NEWLINE                              # command
-    |   '$setdata' '(' expr ',' expr ',' genexpr ')' NEWLINE    # setData
+    |   '$print' '(' expr (',' expr)* ')' NEWLINE               # print
+    |   '$for' forControl stat                                  # for
+    |   '$while' '(' expr ')' stat                              # while
+    |   '$if' '(' expr ')' stat ('$else' stat)?                 # ifElse
+    |   '$function' ID '(' '$' ID (',' '$' ID)* ')' stat        # funcDef  
+    |   '$function' ID '()' stat                                # funcDef  
+    |   '$return' '(' expr ')' NEWLINE                          # return
+    |   '$include' ID NEWLINE                                   # include
+    |   'function' ID '(' ID (',' ID)* ')' stat                 # igFuncDef
+    |   'function' ID '()' stat                                 # igFuncDef
+    |   'return' '(' igexpr ')' NEWLINE                         # igReturn
+    |   'if' '(' igexpr ')' stat ('else' stat)?                 # igIfElse
+    |   'setdisplay' '(' igexpr ',' DSPL_MODE ')' NEWLINE       # setDisplay
+    |   'for' igForControl stat                                 # igFor
+    |   'while' '(' genexpr ')' stat                            # igWhile
+    |   'forentity' '(' expr ';' ID ')' stat                    # igForEntity 
+    |   'execute' '(' expr ')' stat                             # execute
+    |   'mc' '(' expr ')' NEWLINE                               # command
+    |   'setdata' '(' expr ',' expr ',' genexpr ')' NEWLINE     # setData
     |   NEWLINE                                                 # blank
     ;
 
 expr
     :   expr op=('*'|'/'|'-'|'+'|'%'|'^') expr      # op
     |   expr op=('&&'|'||') expr                    # boolOp
-    |   ID                                          # id
+    |   '$' ID                                      # id
     |   literal                                     # constant
     |   '-' number                                  # negative
     |   array                                       # constantArray
     |   '(' expr ')'                                # parens
     |   expr op=('>'|'<'|'>='|'<='|'=='|'!=') expr  # comparison
     |   '!' expr                                    # not
-    |   ID '(' expr (',' expr)* ')'                 # funcCall
-    |   ID '()'                                     # funcCall
+    |   '$' ID '(' expr (',' expr)* ')'             # funcCall
+    |   '$' ID '()'                                 # funcCall
     |   expr '[' expr ']'                           # arrayIndex
     |   expr '.' ID '()'                            # attributeCallEmpty
     |   expr '.' ID '(' expr ')'                    # attributeCall
     |   expr '.' ID                                 # attribute
-    |   'len' '(' expr ')'                          # len
-    |   'abs' '(' expr ')'                          # abs
-    |   'str' '(' expr ')'                          # str
-    |   'int' '(' expr ')'                          # int
-    |   'float' '(' expr ')'                        # float
+    |   '$len' '(' expr ')'                         # len
+    |   '$abs' '(' expr ')'                         # abs
+    |   '$str' '(' expr ')'                         # str
+    |   '$int' '(' expr ')'                         # int
+    |   '$float' '(' expr ')'                       # float
     ;
 
 igexpr
-    :   '$' ID                                                 # igId
-    |   '$' ID '(' genexpr (',' genexpr)* ')'                  # igFuncCall
-    |   '$' ID '()'                                            # igFuncCall
+    :   ID                                                     # igId
+    |   ID '(' genexpr (',' genexpr)* ')'                      # igFuncCall
+    |   ID '()'                                                # igFuncCall
     |   igexpr op=('>'|'<'|'>='|'<='|'=='|'!=') igexpr         # igComparisonIg
     |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr             # igOpIg
     |   igexpr op=('>'|'<'|'>='|'<='|'=='|'!=') expr           # igComparison
     |   igexpr op=('*'|'/'|'+'|'-'|'%'|'^') expr               # igOp
-	|   expr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr               # igOpM
+    |   expr op=('*'|'/'|'+'|'-'|'%'|'^') igexpr               # igOpM
     |   expr op=('>'|'<'|'>='|'<='|'=='|'!=') igexpr           # igComparisonM
     |   igexpr op=('&&'|'||') expr                             # igBoolOp
     |   expr op=('&&'|'||') igexpr                             # igBoolOp
     |   igexpr op=('&&'|'||') igexpr                           # igBoolOp
     |   '!' igexpr                                             # igNot
     |   '(' igexpr ')'                                         # igParens
-    |   '$pos(' expr ',' expr ')'                              # getPos
-    |   '$isblock' '(' expr ',' expr ',' expr ')'              # isBlock
-    |   '$count' '(' expr ')'                                  # count
-    |   '$getscore' '(' expr ',' expr ')'                      # getScore
-    |   '$hastag' '(' expr ',' expr ')'                        # hasTag
-    |   '$print' igPrintControl                                # igPrint
-    |   '$tp' '(' expr ',' expr ')'                            # teleport
-    |   '$addtag' '(' expr ',' expr ')'                        # addTag
-    |   '$remtag' '(' expr ',' expr ')'                        # remTag
-    |   '$addobj' '(' expr ',' expr ')'                        # addObj
-    |   '$setscore' '(' expr ',' expr ',' genexpr ')'          # setScore
-    |   '$getdata' '(' expr ',' expr (',' expr)? ')'           # getData
+    |   'pos(' expr ',' expr ')'                               # getPos
+    |   'isblock' '(' expr ',' expr ',' expr ')'               # isBlock
+    |   'count' '(' expr ')'                                   # count
+    |   'getscore' '(' expr ',' expr ')'                       # getScore
+    |   'hastag' '(' expr ',' expr ')'                         # hasTag
+    |   'print' igPrintControl                                 # igPrint
+    |   'tp' '(' expr ',' expr ')'                             # teleport
+    |   'addtag' '(' expr ',' expr ')'                         # addTag
+    |   'remtag' '(' expr ',' expr ')'                         # remTag
+    |   'addobj' '(' expr ',' expr ')'                         # addObj
+    |   'setscore' '(' expr ',' expr ',' genexpr ')'           # setScore
+    |   'getdata' '(' expr ',' expr (',' expr)? ')'            # getData
     ;
 
 genexpr
@@ -121,18 +121,21 @@ igPrintArg
 
 
 variableDeclaration
-    :   ID '=' expr                                 # assign  
-    |   ID op=('++' | '--')                         # assignUnit
-    |   ID op=('+='|'-='|'*='|'/='|'%=') expr       # assignOp
+    :   '$' ID '=' expr                                 # assign  
+    |   '$' ID op=('++' | '--')                         # assignUnit
+    |   '$' ID op=('+='|'-='|'*='|'/='|'%=') expr       # assignOp
     ;
 
 igVariableDeclaration
-    :   '$' ID '=' expr                                 # igAssign
-    |   '$' ID '=' igexpr                               # igAssignIg
-    |   '$' ID op=('++'|'--')                           # igAssignUnit
-    |   '$' ID op=('+='|'-='|'*='|'/='|'%=') expr       # igAssignOp
-    |   '$' ID op=('+='|'-='|'*='|'/='|'%=') igexpr     # igAssignIgOp
+    :   tp=('int'|'float'|'string') ID '=' expr     # igFirstAssign
+    |   ID '=' expr                                 # igAssign
+    |   ID '=' igexpr                               # igAssignIg
+    |   tp=('int'|'float'|'string') ID '=' igexpr   # igFirstAssignIg
+    |   ID op=('++'|'--')                           # igAssignUnit
+    |   ID op=('+='|'-='|'*='|'/='|'%=') expr       # igAssignOp
+    |   ID op=('+='|'-='|'*='|'/='|'%=') igexpr     # igAssignIgOp
     ;
+
 
 
 literal

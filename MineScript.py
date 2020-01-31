@@ -154,19 +154,34 @@ def assemble_pack(name, memory, path):
         if verbose >= 2: print("Setting up variables")
         for variable in memory[0]:
             if not variable.startswith("_"):
-                if verbose >= 2: print("Found ingame variable %s, adding it to the scoreboard"%variable)
-                file.write("scoreboard objectives add %s dummy {\"text\":\"%s\"}\n"%(variable, variable.capitalize()))
-                file.write("scoreboard players set MineScript %s 0\n"%variable)
-                commands += 2
+                if memory[0][variable] == "int":
+                    if verbose >= 2: print(f"Found ingame integer variable %s, adding it to the scoreboard"%variable)
+                    file.write("scoreboard objectives add %s dummy {\"text\":\"%s\"}\n"%(variable, variable.capitalize()))
+                    file.write("scoreboard players set MineScript %s 0\n"%variable)
+                    commands += 2
+                elif memory[0][variable] == "float":
+                    if verbose >= 2: print("Found ingame floating-point variable %s, adding it to the scoreboard"%variable)
+                    file.write("scoreboard objectives add %s dummy {\"text\":\"%s\"}\n"%(variable+"_int", "int " + variable.capitalize()))
+                    file.write("scoreboard objectives add %s dummy {\"text\":\"%s\"}\n"%(variable+"_dec", "dec " + variable.capitalize()))
+                    file.write("scoreboard players set MineScript %s 0\n"%(variable+"_int"))
+                    file.write("scoreboard players set MineScript %s 0\n"%(variable+"_dec"))
+                    commands += 4
 
     # Setup "_var%%" variables
     with open(os.path.join(path, name, "data", name, "functions", "_vars.mcfunction"), "w") as file:
         if verbose >= 2: print("\nSetting up temporary variables")
         for variable in memory[0]:
             if variable.startswith("_"):
-                file.write("scoreboard objectives add %s dummy\n"%variable)
-                file.write("scoreboard players set MineScript %s 0\n"%variable)
-                commands += 2
+                if memory[0][variable] == "int":
+                    file.write("scoreboard objectives add %s dummy\n"%variable)
+                    file.write("scoreboard players set MineScript %s 0\n"%variable)
+                    commands += 2
+                elif memory[0][variable] == "float":
+                    file.write("scoreboard objectives add %s dummy\n"%(variable+"_int"))
+                    file.write("scoreboard players set MineScript %s 0\n"%( variable+"_int"))
+                    file.write("scoreboard objectives add %s dummy\n"%(variable+"_dec"))
+                    file.write("scoreboard players set MineScript %s 0\n"%(variable+"_dec"))
+                    commands += 4
 
     # Setup loops
     if verbose >= 2: print("\nSetting up loops")
