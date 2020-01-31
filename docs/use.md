@@ -2,7 +2,7 @@
 
 The first step is creating a file for your project. The default file extension for MineScript files is `.ms`,
 and all code for your datapack should be in that file. You should also create a file with the same name, but with
-the extension `.info`, where you'll write the name of your datapack in the first line and its description on the second.
+the extension `.info`, where you'll write the name of your datapack in the first line and its description on the second. There's an `.xml` file in the main directory that can be used as a language file for Notepad++, if you choose to use it as your default editor.
 
 ## Basics
 
